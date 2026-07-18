@@ -79,6 +79,8 @@ class CategoryModel {
 }
 
 class TransactionModel {
+  static const _unchanged = Object();
+
   final String id;
   final int amountFen;
   final String type; // 'expense' | 'income'
@@ -146,6 +148,40 @@ class TransactionModel {
       'is_deleted': isDeleted ? 1 : 0,
       'updated_at': DateTime.now().toIso8601String(),
     };
+  }
+
+  TransactionModel copyWith({
+    String? id,
+    int? amountFen,
+    String? type,
+    int? categoryId,
+    String? transactionDate,
+    Object? description = _unchanged,
+    String? counterparty,
+    String? paymentMethod,
+    String? source,
+    String? importBatchId,
+    String? externalId,
+    bool? isDeleted,
+  }) {
+    return TransactionModel(
+      id: id ?? this.id,
+      amountFen: amountFen ?? this.amountFen,
+      type: type ?? this.type,
+      categoryId: categoryId ?? this.categoryId,
+      transactionDate: transactionDate ?? this.transactionDate,
+      description: identical(description, _unchanged)
+          ? this.description
+          : description as String?,
+      counterparty: counterparty ?? this.counterparty,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      source: source ?? this.source,
+      importBatchId: importBatchId ?? this.importBatchId,
+      externalId: externalId ?? this.externalId,
+      isDeleted: isDeleted ?? this.isDeleted,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+    );
   }
 }
 
@@ -225,15 +261,15 @@ class ImportBatch {
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'source': source,
-        'file_name': fileName,
-        'total_count': totalCount,
-        'imported_count': importedCount,
-        'skipped_count': skippedCount,
-        'status': status,
-        'created_at': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'source': source,
+    'file_name': fileName,
+    'total_count': totalCount,
+    'imported_count': importedCount,
+    'skipped_count': skippedCount,
+    'status': status,
+    'created_at': createdAt.toIso8601String(),
+  };
 }
 
 /// 导入规则（用户自定义字段映射）
@@ -241,7 +277,8 @@ class ImportRule {
   final int? id;
   final String source;
   final String name;
-  final Map<String, String> fieldMapping; // {"date":"交易时间","amount":"金额(元)",...}
+  final Map<String, String>
+  fieldMapping; // {"date":"交易时间","amount":"金额(元)",...}
   final String? dateFormat;
   final String amountSignConvention; // '支出为正' | '收入为正'
   final List<String>? skipKeywords;
@@ -267,21 +304,24 @@ class ImportRule {
       dateFormat: map['date_format'] as String?,
       amountSignConvention: map['amount_sign_convention'] as String? ?? '支出为正',
       skipKeywords: map['skip_keywords'] != null
-          ? (map['skip_keywords'] as String).split(',').map((s) => s.trim()).toList()
+          ? (map['skip_keywords'] as String)
+                .split(',')
+                .map((s) => s.trim())
+                .toList()
           : null,
       isDefault: (map['is_default'] as int? ?? 0) == 1,
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'source': source,
-        'name': name,
-        'field_mapping': _encodeJsonMap(fieldMapping),
-        'date_format': dateFormat,
-        'amount_sign_convention': amountSignConvention,
-        'skip_keywords': skipKeywords?.join(','),
-        'is_default': isDefault ? 1 : 0,
-      };
+    'source': source,
+    'name': name,
+    'field_mapping': _encodeJsonMap(fieldMapping),
+    'date_format': dateFormat,
+    'amount_sign_convention': amountSignConvention,
+    'skip_keywords': skipKeywords?.join(','),
+    'is_default': isDefault ? 1 : 0,
+  };
 
   static Map<String, String> _parseJsonMap(String json) {
     // 简单 JSON map 解析，避免引入 dart:convert 依赖
@@ -375,14 +415,14 @@ class RecurringTransaction {
   }
 
   Map<String, dynamic> toMap() => {
-        'amount_fen': amountFen,
-        'type': type,
-        'category_id': categoryId,
-        'frequency': frequency,
-        'interval_day': intervalDay,
-        'next_due_date': nextDueDate,
-        'description': description,
-        'is_active': isActive ? 1 : 0,
-        'created_at': createdAt.toIso8601String(),
-      };
+    'amount_fen': amountFen,
+    'type': type,
+    'category_id': categoryId,
+    'frequency': frequency,
+    'interval_day': intervalDay,
+    'next_due_date': nextDueDate,
+    'description': description,
+    'is_active': isActive ? 1 : 0,
+    'created_at': createdAt.toIso8601String(),
+  };
 }

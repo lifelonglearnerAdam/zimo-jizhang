@@ -2,21 +2,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database.dart';
 
 /// 某月预算（分）
-final budgetProvider = FutureProvider.family<int?, String>((ref, yearMonth) async {
+final budgetProvider = FutureProvider.family<int?, String>((
+  ref,
+  yearMonth,
+) async {
   final dao = BudgetDao();
   return dao.getBudget(yearMonth: yearMonth);
 });
 
 /// 某月所有预算（含分类预算）
-final allBudgetsProvider = FutureProvider.family<Map<int?, int>, String>((ref, yearMonth) async {
+final allBudgetsProvider = FutureProvider.family<Map<int?, int>, String>((
+  ref,
+  yearMonth,
+) async {
   final dao = BudgetDao();
   return dao.getAllBudgets(yearMonth);
 });
 
 /// 预算管理 Notifier
-final budgetNotifierProvider = StateNotifierProvider<BudgetNotifier, AsyncValue<Map<int?, int>>>((ref) {
-  return BudgetNotifier(ref);
-});
+final budgetNotifierProvider =
+    StateNotifierProvider<BudgetNotifier, AsyncValue<Map<int?, int>>>((ref) {
+      return BudgetNotifier(ref);
+    });
 
 class BudgetNotifier extends StateNotifier<AsyncValue<Map<int?, int>>> {
   final Ref _ref;
@@ -41,7 +48,11 @@ class BudgetNotifier extends StateNotifier<AsyncValue<Map<int?, int>>> {
 
   Future<void> setBudget({int? categoryId, required int amountFen}) async {
     final dao = BudgetDao();
-    await dao.setBudget(categoryId: categoryId, amountFen: amountFen, yearMonth: _yearMonth);
+    await dao.setBudget(
+      categoryId: categoryId,
+      amountFen: amountFen,
+      yearMonth: _yearMonth,
+    );
     // 刷新预算列表 provider
     _ref.invalidate(allBudgetsProvider(_yearMonth));
     await loadBudgets();

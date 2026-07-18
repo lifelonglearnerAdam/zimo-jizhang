@@ -30,7 +30,14 @@ class CategoryMatcher {
 
   Future<List<_TxRef>> _searchTransactions(String keyword) async {
     final txs = await _txDao.search(keyword);
-    return txs.map((t) => _TxRef(categoryId: t.categoryId, description: t.description ?? '')).toList();
+    return txs
+        .map(
+          (t) => _TxRef(
+            categoryId: t.categoryId,
+            description: t.description ?? '',
+          ),
+        )
+        .toList();
   }
 
   MatchResult _bestMatch(List<_TxRef> refs, int baseConfidence) {
@@ -41,12 +48,14 @@ class CategoryMatcher {
         count[r.categoryId!] = (count[r.categoryId!] ?? 0) + 1;
       }
     }
-    if (count.isEmpty) return MatchResult(categoryId: null, categoryName: '未分类', confidence: 0);
+    if (count.isEmpty)
+      return MatchResult(categoryId: null, categoryName: '未分类', confidence: 0);
 
     final best = count.entries.reduce((a, b) => a.value > b.value ? a : b);
     final matchCount = best.value;
     final total = refs.length;
-    final confidence = (baseConfidence * (matchCount / total).clamp(0.5, 1.0)).round();
+    final confidence = (baseConfidence * (matchCount / total).clamp(0.5, 1.0))
+        .round();
 
     return MatchResult(
       categoryId: best.key,
@@ -73,11 +82,7 @@ class MatchResult {
   final String? categoryName;
   final int confidence;
 
-  const MatchResult({
-    this.categoryId,
-    this.categoryName,
-    this.confidence = 0,
-  });
+  const MatchResult({this.categoryId, this.categoryName, this.confidence = 0});
 }
 
 class _TxRef {

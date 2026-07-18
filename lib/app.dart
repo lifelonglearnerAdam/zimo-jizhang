@@ -1,50 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'core/theme.dart';
+
 import 'core/constants.dart';
-import 'providers/theme_provider.dart';
-import 'features/dashboard/dashboard_page.dart';
-import 'features/statistics/statistics_page.dart';
-import 'features/budget/budget_page.dart';
-import 'features/settings/settings_page.dart';
-import 'core/utils.dart';
-import 'data/models.dart';
-import 'providers/transaction_provider.dart';
-import 'providers/category_provider.dart';
+import 'core/theme.dart';
 import 'features/add_transaction/add_transaction_dialog.dart';
+import 'features/budget/budget_page.dart';
+import 'features/dashboard/dashboard_page.dart';
 import 'features/import/import_page.dart';
-import 'features/sync/sync_page.dart';
-import 'features/voice/voice_input_page.dart';
-import 'features/recurring/recurring_page.dart';
 import 'features/ocr/ocr_page.dart';
+import 'features/recurring/recurring_page.dart';
+import 'features/statistics/statistics_page.dart';
+import 'features/sync/sync_page.dart';
+import 'features/transaction_list/transaction_list_page.dart';
+import 'features/settings/settings_page.dart';
+import 'providers/theme_provider.dart';
+import 'providers/transaction_provider.dart';
 
 final _routerProvider = Provider<GoRouter>((ref) {
-  return GoRouter(initialLocation: '/', routes: [
-    ShellRoute(builder: (_, __, child) => AppShell(child: child), routes: [
-      GoRoute(path: '/', builder: (_, __) => const DashboardPage()),
-      GoRoute(path: '/stats', builder: (_, __) => const StatisticsPage()),
-      GoRoute(path: '/budget', builder: (_, __) => const BudgetPage()),
-      GoRoute(path: '/settings', builder: (_, __) => const SettingsPage()),
-    ]),
-    GoRoute(path: '/import', builder: (_, __) => const ImportPage()),
-    GoRoute(path: '/sync', builder: (_, __) => const SyncPage()),
-    GoRoute(path: '/voice', builder: (_, __) => const VoiceInputPage()),
-    GoRoute(path: '/recurring', builder: (_, __) => const RecurringPage()),
-    GoRoute(path: '/ocr', builder: (_, __) => const OcrPage()),
-  ]);
+  return GoRouter(
+    initialLocation: '/',
+    routes: [
+      ShellRoute(
+        builder: (_, __, child) => AppShell(child: child),
+        routes: [
+          GoRoute(path: '/', builder: (_, __) => const DashboardPage()),
+          GoRoute(
+            path: '/transactions',
+            builder: (_, __) => const TransactionListPage(),
+          ),
+          GoRoute(path: '/stats', builder: (_, __) => const StatisticsPage()),
+          GoRoute(path: '/budget', builder: (_, __) => const BudgetPage()),
+          GoRoute(path: '/settings', builder: (_, __) => const SettingsPage()),
+        ],
+      ),
+      GoRoute(path: '/import', builder: (_, __) => const ImportPage()),
+      GoRoute(path: '/sync', builder: (_, __) => const SyncPage()),
+      GoRoute(path: '/recurring', builder: (_, __) => const RecurringPage()),
+      GoRoute(path: '/ocr', builder: (_, __) => const OcrPage()),
+    ],
+  );
 });
 
 class ZimoJizhangApp extends ConsumerWidget {
   const ZimoJizhangApp({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(_routerProvider);
-    final tm = ref.watch(themeModeProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
-      title: '子墨记账', theme: AppTheme.lightTheme, darkTheme: AppTheme.darkTheme,
-      themeMode: tm == AppThemeMode.light ? ThemeMode.light : tm == AppThemeMode.dark ? ThemeMode.dark : ThemeMode.system,
-      routerConfig: router, debugShowCheckedModeBanner: false,
+      title: AppConstants.appName,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode == AppThemeMode.light
+          ? ThemeMode.light
+          : themeMode == AppThemeMode.dark
+          ? ThemeMode.dark
+          : ThemeMode.system,
+      routerConfig: router,
+      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -52,81 +68,293 @@ class ZimoJizhangApp extends ConsumerWidget {
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
+
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  static const _routes = ['/', '/stats', '/budget', '/settings'];
-  static const _titles = ['子墨记账', '统计分析', '预算管理', '设置'];
-  static const _icons = [Icons.dashboard_rounded, Icons.pie_chart_rounded, Icons.savings_rounded, Icons.settings_rounded];
-  static const _labels = ['总览', '统计', '预算', '设置'];
+  static const _destinations = [
+    (Icons.home_outlined, Icons.home_rounded, '总览', '/'),
+    (
+      Icons.receipt_long_outlined,
+      Icons.receipt_long_rounded,
+      '明细',
+      '/transactions',
+    ),
+    (Icons.pie_chart_outline_rounded, Icons.pie_chart_rounded, '统计', '/stats'),
+    (Icons.savings_outlined, Icons.savings_rounded, '预算', '/budget'),
+    (Icons.settings_outlined, Icons.settings_rounded, '设置', '/settings'),
+  ];
 
-  int get _idx {
-    final uri = GoRouterState.of(context).uri.toString();
-    final i = _routes.indexOf(uri);
-    return i >= 0 ? i : 0;
+  int get _selectedIndex {
+    final path = GoRouterState.of(context).uri.path;
+    final index = _destinations.indexWhere((item) => item.$4 == path);
+    return index < 0 ? 0 : index;
   }
 
   @override
   Widget build(BuildContext context) {
-    final w = MediaQuery.of(context).size.width;
-    final isDesktop = w >= AppConstants.breakpointWidth;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final idx = _idx;
+    final isDesktop =
+        MediaQuery.sizeOf(context).width >= AppConstants.breakpointWidth;
+    final selectedIndex = _selectedIndex;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF2F4F7),
-      appBar: isDesktop ? null : AppBar(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        title: Row(children: [
-          Container(width: 28, height: 28, decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(7)), alignment: Alignment.center, child: const Text('墨', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700))),
-          const SizedBox(width: 8), Text(_titles[idx]),
-        ]),
-      ),
-      body: isDesktop ? Row(children: [
-        Container(width: 200, color: isDark ? const Color(0xFF1E293B) : Colors.white, child: Column(children: [
-          const SizedBox(height: 28),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
-            Container(width: 34, height: 34, decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(9)), alignment: Alignment.center, child: const Text('墨', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800))),
-            const SizedBox(width: 10), const Text('子墨记账', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-          ])),
-          const SizedBox(height: 20),
-          ...List.generate(4, (i) { final sel = idx == i; return Padding(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2), child: Material(color: sel ? AppColors.primaryLightest.withOpacity(0.5) : Colors.transparent, borderRadius: BorderRadius.circular(10), child: InkWell(onTap: () => GoRouter.of(context).go(_routes[i]), borderRadius: BorderRadius.circular(10), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), child: Row(children: [Icon(_icons[i], size: 21, color: sel ? AppColors.primary : AppColors.textSecondary), const SizedBox(width: 10), Text(_labels[i], style: TextStyle(fontSize: 14, fontWeight: sel ? FontWeight.w600 : FontWeight.normal, color: sel ? AppColors.primary : AppColors.textSecondary))]))))); }),
-        ])),
-        const VerticalDivider(width: 1), Expanded(child: widget.child),
-      ]) : widget.child,
-      bottomNavigationBar: isDesktop ? null : NavigationBar(
-        selectedIndex: idx, onDestinationSelected: (i) => GoRouter.of(context).go(_routes[i]),
-        animationDuration: const Duration(milliseconds: 300),
-        destinations: List.generate(4, (i) => NavigationDestination(icon: Icon(_icons[i]), label: _labels[i])),
-      ),
-      floatingActionButton: idx == 0 ? Container(
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.45), blurRadius: 16, offset: const Offset(0, 6))]),
-        child: FloatingActionButton.extended(
-          onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AddTransactionDialog(
-                    onSubmitted: (type, category, amount, note, date) {
-                      final fen = MoneyUtils.yuanToFen(double.parse(amount));
-                      ref.read(transactionListNotifierProvider.notifier).addTransaction(
-                        amountFen: fen,
-                        categoryId: category.id,
-                        date: date,
-                        description: note.isNotEmpty ? note : null,
-                        type: type,
-                      );
-                    },
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.keyN, control: true):
+            _openAddDialog,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: isDesktop
+              ? null
+              : AppBar(
+                  title: Row(
+                    children: [
+                      _BrandMark(size: 30),
+                      const SizedBox(width: 9),
+                      Text(_destinations[selectedIndex].$3),
+                    ],
                   ),
-                );
-              },
-          icon: const Icon(Icons.add_rounded, size: 28), label: Text('记一笔', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-          backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  actions: [
+                    IconButton(
+                      tooltip: '记一笔',
+                      onPressed: _openAddDialog,
+                      icon: const Icon(Icons.add_rounded),
+                    ),
+                  ],
+                ),
+          body: isDesktop
+              ? Row(
+                  children: [
+                    _DesktopSidebar(
+                      selectedIndex: selectedIndex,
+                      onAdd: _openAddDialog,
+                    ),
+                    Expanded(child: widget.child),
+                  ],
+                )
+              : widget.child,
+          bottomNavigationBar: isDesktop
+              ? null
+              : NavigationBar(
+                  selectedIndex: selectedIndex,
+                  onDestinationSelected: (index) =>
+                      context.go(_destinations[index].$4),
+                  destinations: [
+                    for (final item in _destinations)
+                      NavigationDestination(
+                        icon: Icon(item.$1),
+                        selectedIcon: Icon(item.$2),
+                        label: item.$3,
+                      ),
+                  ],
+                ),
+          floatingActionButton: isDesktop || selectedIndex > 1
+              ? null
+              : FloatingActionButton.extended(
+                  onPressed: _openAddDialog,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('记一笔'),
+                ),
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerFloat,
         ),
-      ) : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      ),
     );
   }
+
+  Future<void> _openAddDialog() async {
+    final notifier = ref.read(transactionListNotifierProvider.notifier);
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AddTransactionDialog(
+        onSubmitted: (draft) => notifier.addTransaction(
+          amountFen: draft.amountFen,
+          categoryId: draft.category.id,
+          date: draft.date,
+          description: draft.note,
+          type: draft.type,
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopSidebar extends StatelessWidget {
+  final int selectedIndex;
+  final VoidCallback onAdd;
+  const _DesktopSidebar({required this.selectedIndex, required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: 232,
+      padding: const EdgeInsets.fromLTRB(14, 24, 14, 18),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.surface,
+        border: Border(
+          right: BorderSide(
+            color: isDark ? AppColors.darkDivider : AppColors.divider,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(10, 0, 10, 22),
+            child: Row(
+              children: [
+                _BrandMark(size: 38),
+                SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '子墨记账',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '把生活记得明白',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded, size: 19),
+              label: const Text('记一笔'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              '工作台',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textHint,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...List.generate(_AppShellState._destinations.length, (index) {
+            final item = _AppShellState._destinations[index];
+            final selected = index == selectedIndex;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: ListTile(
+                dense: true,
+                selected: selected,
+                selectedTileColor: AppColors.primaryLightest,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                leading: Icon(
+                  selected ? item.$2 : item.$1,
+                  size: 20,
+                  color: selected ? AppColors.primary : AppColors.textSecondary,
+                ),
+                title: Text(
+                  item.$3,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+                onTap: () => context.go(item.$4),
+              ),
+            );
+          }),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurfaceAlt : AppColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 17,
+                  color: AppColors.primary,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '数据只保存在这台设备',
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.35,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              '版本 2.0.0',
+              style: TextStyle(fontSize: 11, color: AppColors.textHint),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  final double size;
+  const _BrandMark({required this.size});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(size * 0.28),
+    ),
+    child: Text(
+      '墨',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: size * 0.43,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
 }

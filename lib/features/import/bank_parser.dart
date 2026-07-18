@@ -4,8 +4,10 @@ import 'wechat_parser.dart'; // 复用 ParsedBillEntry
 /// 银行账单 CSV 解析器（通用模板）
 class BankParser {
   /// 解析银行账单，支持自定义字段映射
-  static List<ParsedBillEntry> parse(CsvParseResult csv,
-      {Map<String, String>? fieldMapping}) {
+  static List<ParsedBillEntry> parse(
+    CsvParseResult csv, {
+    Map<String, String>? fieldMapping,
+  }) {
     final mapping = fieldMapping ?? _defaultMapping();
     final entries = <ParsedBillEntry>[];
 
@@ -28,12 +30,16 @@ class BankParser {
 
         if (amountStr == null || dateStr == null) continue;
 
-        final cleanAmount = amountStr.replaceAll(',', '').replaceAll('¥', '').trim();
+        final cleanAmount = amountStr
+            .replaceAll(',', '')
+            .replaceAll('¥', '')
+            .trim();
         final amount = double.tryParse(cleanAmount);
         if (amount == null) continue;
 
         // 银行收支方向：贷/收入，借/支出
-        final isExpense = typeStr == null ||
+        final isExpense =
+            typeStr == null ||
             typeStr.contains('支出') ||
             typeStr.contains('借') ||
             typeStr.contains('消费');
@@ -43,16 +49,18 @@ class BankParser {
         // 跳过利息等非消费记录
         if (desc.contains('利息') || desc.contains('结息')) continue;
 
-        entries.add(ParsedBillEntry(
-          date: _normalizeBankDate(dateStr),
-          type: type,
-          amountFen: (amount * 100).round(),
-          description: desc,
-          counterparty: counterparty ?? '',
-          paymentMethod: '银行卡',
-          externalId: externalId,
-          source: 'bank_csv',
-        ));
+        entries.add(
+          ParsedBillEntry(
+            date: _normalizeBankDate(dateStr),
+            type: type,
+            amountFen: (amount * 100).round(),
+            description: desc,
+            counterparty: counterparty ?? '',
+            paymentMethod: '银行卡',
+            externalId: externalId,
+            source: 'bank_csv',
+          ),
+        );
       } catch (_) {}
     }
 
@@ -81,11 +89,11 @@ class BankParser {
   }
 
   static Map<String, String> _defaultMapping() => {
-        'date': '交易日期',
-        'amount': '交易金额',
-        'type': '收支方向',
-        'description': '摘要',
-        'counterparty': '对方户名',
-        'external_id': '流水号',
-      };
+    'date': '交易日期',
+    'amount': '交易金额',
+    'type': '收支方向',
+    'description': '摘要',
+    'counterparty': '对方户名',
+    'external_id': '流水号',
+  };
 }

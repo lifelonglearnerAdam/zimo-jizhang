@@ -55,7 +55,10 @@ class _CategoryPickerState extends ConsumerState<CategoryPicker> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('选择分类', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        const Text(
+          '选择分类',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
         const SizedBox(height: 8),
         parentsAsync.when(
           data: (parents) => Wrap(
@@ -87,12 +90,22 @@ class _CategoryPickerState extends ConsumerState<CategoryPicker> {
 
         if (_selectedParentId != null && subsAsync != null) ...[
           const SizedBox(height: 16),
-          Text('选择小类', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+          Text(
+            '选择小类',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
           const SizedBox(height: 8),
           subsAsync.when(
             data: (subs) {
               if (subs.isEmpty) {
-                return Text('该分类下暂无小类', style: TextStyle(color: AppColors.textHint, fontSize: 13));
+                return Text(
+                  '该分类下暂无小类',
+                  style: TextStyle(color: AppColors.textHint, fontSize: 13),
+                );
               }
               return Wrap(
                 spacing: 8,
@@ -108,8 +121,12 @@ class _CategoryPickerState extends ConsumerState<CategoryPicker> {
                     },
                     selectedColor: AppColors.primaryLightest,
                     labelStyle: TextStyle(
-                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   );
                 }).toList(),
@@ -117,7 +134,13 @@ class _CategoryPickerState extends ConsumerState<CategoryPicker> {
             },
             loading: () => const SizedBox(
               height: 32,
-              child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
             ),
             error: (e, _) => Text('加载小类失败'),
           ),

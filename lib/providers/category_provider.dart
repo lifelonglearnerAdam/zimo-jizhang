@@ -3,13 +3,17 @@ import '../data/models.dart';
 import 'database_provider.dart';
 
 /// 所有大类
-final parentCategoriesProvider = FutureProvider<List<CategoryModel>>((ref) async {
+final parentCategoriesProvider = FutureProvider<List<CategoryModel>>((
+  ref,
+) async {
   final dao = ref.watch(categoryDaoProvider);
   return dao.getParentCategories();
 });
 
 /// 所有小类（含父分类信息）
-final allSubCategoriesProvider = FutureProvider<List<CategoryWithParent>>((ref) async {
+final allSubCategoriesProvider = FutureProvider<List<CategoryWithParent>>((
+  ref,
+) async {
   final dao = ref.watch(categoryDaoProvider);
   return dao.getAllSubCategoriesWithParent();
 });
@@ -21,19 +25,25 @@ final allCategoriesProvider = FutureProvider<List<CategoryModel>>((ref) async {
 });
 
 /// 某大类下的小类
-final subCategoriesProvider =
-    FutureProvider.family<List<CategoryModel>, int>((ref, parentId) async {
+final subCategoriesProvider = FutureProvider.family<List<CategoryModel>, int>((
+  ref,
+  parentId,
+) async {
   final dao = ref.watch(categoryDaoProvider);
   return dao.getSubCategories(parentId);
 });
 
 /// 分类管理 Notifier
 final categoryListNotifierProvider =
-    StateNotifierProvider<CategoryListNotifier, AsyncValue<List<CategoryModel>>>((ref) {
-  return CategoryListNotifier(ref);
-});
+    StateNotifierProvider<
+      CategoryListNotifier,
+      AsyncValue<List<CategoryModel>>
+    >((ref) {
+      return CategoryListNotifier(ref);
+    });
 
-class CategoryListNotifier extends StateNotifier<AsyncValue<List<CategoryModel>>> {
+class CategoryListNotifier
+    extends StateNotifier<AsyncValue<List<CategoryModel>>> {
   final Ref _ref;
 
   CategoryListNotifier(this._ref) : super(const AsyncValue.loading()) {

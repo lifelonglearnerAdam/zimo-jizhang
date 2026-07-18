@@ -2,17 +2,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database.dart';
 
 /// 所有账户
-final accountsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final accountsProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final dao = AccountDao();
   return dao.getAll();
 });
 
 /// 账户管理 Notifier
-final accountListProvider = StateNotifierProvider<AccountNotifier, AsyncValue<List<Map<String, dynamic>>>>((ref) {
-  return AccountNotifier();
-});
+final accountListProvider =
+    StateNotifierProvider<
+      AccountNotifier,
+      AsyncValue<List<Map<String, dynamic>>>
+    >((ref) {
+      return AccountNotifier();
+    });
 
-class AccountNotifier extends StateNotifier<AsyncValue<List<Map<String, dynamic>>>> {
+class AccountNotifier
+    extends StateNotifier<AsyncValue<List<Map<String, dynamic>>>> {
   AccountNotifier() : super(const AsyncValue.loading()) {
     load();
   }

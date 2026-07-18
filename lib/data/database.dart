@@ -1,5 +1,4 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' as p;
 
 import 'models.dart';
 import 'seed_data.dart';
@@ -30,8 +29,7 @@ class DatabaseService {
     // - 移动端：无操作（使用原生 sqflite 平台通道）
     configureDatabaseFactory();
 
-    final dbPath = await getDatabasesPath();
-    final path = p.join(dbPath, 'zimo_jizhang.db');
+    final path = await resolveDatabasePath('zimo_jizhang.db');
 
     return openDatabase(
       path,
@@ -107,8 +105,12 @@ class DatabaseService {
     ''');
 
     // 创建索引
-    await db.execute('CREATE INDEX idx_tx_date ON transactions(transaction_date)');
-    await db.execute('CREATE INDEX idx_tx_category ON transactions(category_id)');
+    await db.execute(
+      'CREATE INDEX idx_tx_date ON transactions(transaction_date)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_tx_category ON transactions(category_id)',
+    );
     await db.execute('CREATE INDEX idx_tx_type ON transactions(type)');
 
     // 插入默认分类
@@ -202,7 +204,11 @@ class DatabaseService {
     }
   }
 
-  Future<void> _insertCategorySeed(Database db, CategorySeed seed, int sortOrder) async {
+  Future<void> _insertCategorySeed(
+    Database db,
+    CategorySeed seed,
+    int sortOrder,
+  ) async {
     final parentId = await db.insert('categories', {
       'name': seed.name,
       'icon': seed.icon,
@@ -398,7 +404,12 @@ class TransactionDao {
 
   Future<int> update(TransactionModel tx) async {
     final db = await _db.database;
-    return db.update('transactions', tx.toMap(), where: 'id = ?', whereArgs: [tx.id]);
+    return db.update(
+      'transactions',
+      tx.toMap(),
+      where: 'id = ?',
+      whereArgs: [tx.id],
+    );
   }
 
   Future<int> softDelete(String id) async {
@@ -406,6 +417,17 @@ class TransactionDao {
     return db.update(
       'transactions',
       {'is_deleted': 1, 'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 恢复一条被软删除的记录，用于误删撤销。
+  Future<int> restore(String id) async {
+    final db = await _db.database;
+    return db.update(
+      'transactions',
+      {'is_deleted': 0, 'updated_at': DateTime.now().toIso8601String()},
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -423,13 +445,67 @@ class TransactionDao {
     return maps.map((m) => TransactionModel.fromMap(m)).toList();
   }
 
-  Future<List<TransactionModel>> getByMonth(String yearMonth, {int? categoryId}) async {
+  /// 合并恢复备份。已有相同 id 的记录保持原样，不覆盖、不删除。
+  Future<int> restoreBackup(List<Map<String, dynamic>> rows) async {
+    final db = await _db.database;
+    var imported = 0;
+    await db.transaction((txn) async {
+      for (final row in rows) {
+        final id = row['id'];
+        final amountFen = row['amount_fen'];
+        final date = row['transaction_date'];
+        final type = row['type'];
+        if (id is! String ||
+            id.isEmpty ||
+            amountFen is! num ||
+            date is! String ||
+            (type != 'expense' && type != 'income')) {
+          continue;
+        }
+
+        final existing = await txn.query(
+          'transactions',
+          columns: ['id'],
+          where: 'id = ?',
+          whereArgs: [id],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) continue;
+
+        final now = DateTime.now().toIso8601String();
+        await txn.insert('transactions', {
+          'id': id,
+          'amount_fen': amountFen.toInt(),
+          'type': type,
+          'category_id': row['category_id'],
+          'transaction_date': date,
+          'description': row['description'],
+          'counterparty': row['counterparty'],
+          'payment_method': row['payment_method'],
+          'source': row['source'] == 'import' ? 'import' : 'manual',
+          'import_batch_id': row['import_batch_id'],
+          'external_id': row['external_id'],
+          'is_deleted': 0,
+          'created_at': row['created_at'] ?? now,
+          'updated_at': row['updated_at'] ?? now,
+        });
+        imported++;
+      }
+    });
+    return imported;
+  }
+
+  Future<List<TransactionModel>> getByMonth(
+    String yearMonth, {
+    int? categoryId,
+  }) async {
     final db = await _db.database;
     final startDate = '$yearMonth-01';
     final endDate = _getEndDate(yearMonth);
 
-    String where = 'is_deleted = 0 AND transaction_date >= ? AND transaction_date <= ? AND type = ?';
-    List<dynamic> args = [startDate, endDate, 'expense'];
+    String where =
+        'is_deleted = 0 AND transaction_date >= ? AND transaction_date <= ?';
+    List<dynamic> args = [startDate, endDate];
 
     if (categoryId != null) {
       where += ' AND category_id = ?';
@@ -439,6 +515,48 @@ class TransactionDao {
     final maps = await db.query(
       'transactions',
       where: where,
+      whereArgs: args,
+      orderBy: 'transaction_date DESC, created_at DESC',
+    );
+    return maps.map((m) => TransactionModel.fromMap(m)).toList();
+  }
+
+  /// 按月份、收支类型和关键词组合筛选记录。
+  Future<List<TransactionModel>> getFiltered({
+    String? yearMonth,
+    String? type,
+    String? keyword,
+    int? categoryId,
+  }) async {
+    final db = await _db.database;
+    final conditions = <String>['is_deleted = 0'];
+    final args = <dynamic>[];
+
+    if (yearMonth != null) {
+      conditions.add('transaction_date >= ? AND transaction_date <= ?');
+      args
+        ..add('$yearMonth-01')
+        ..add(_getEndDate(yearMonth));
+    }
+    if (type != null && type != 'all') {
+      conditions.add('type = ?');
+      args.add(type);
+    }
+    if (categoryId != null) {
+      conditions.add('category_id = ?');
+      args.add(categoryId);
+    }
+    if (keyword != null && keyword.trim().isNotEmpty) {
+      conditions.add('(description LIKE ? OR counterparty LIKE ?)');
+      final value = '%${keyword.trim()}%';
+      args
+        ..add(value)
+        ..add(value);
+    }
+
+    final maps = await db.query(
+      'transactions',
+      where: conditions.join(' AND '),
       whereArgs: args,
       orderBy: 'transaction_date DESC, created_at DESC',
     );
@@ -476,7 +594,9 @@ class TransactionDao {
   Future<int> getMonthTotalExpense() async {
     final now = DateTime.now();
     final startDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
-    final endDate = _getEndDate('${now.year}-${now.month.toString().padLeft(2, '0')}');
+    final endDate = _getEndDate(
+      '${now.year}-${now.month.toString().padLeft(2, '0')}',
+    );
 
     final db = await _db.database;
     final result = await db.rawQuery(
@@ -491,8 +611,9 @@ class TransactionDao {
     final lastMonth = DateTime(now.year, now.month - 1, 1);
     final startDate =
         '${lastMonth.year}-${lastMonth.month.toString().padLeft(2, '0')}-01';
-    final endDate =
-        _getEndDate('${lastMonth.year}-${lastMonth.month.toString().padLeft(2, '0')}');
+    final endDate = _getEndDate(
+      '${lastMonth.year}-${lastMonth.month.toString().padLeft(2, '0')}',
+    );
 
     final db = await _db.database;
     final result = await db.rawQuery(
@@ -511,18 +632,25 @@ class TransactionDao {
       'SELECT transaction_date, SUM(amount_fen) as total FROM transactions WHERE is_deleted = 0 AND transaction_date >= ? AND transaction_date <= ? AND type = ? GROUP BY transaction_date ORDER BY transaction_date',
       [startDate, endDate, 'expense'],
     );
-    return results.map((r) => DailyExpense(
-          date: r['transaction_date'] as String,
-          amountFen: _toInt(r['total']),
-        )).toList();
+    return results
+        .map(
+          (r) => DailyExpense(
+            date: r['transaction_date'] as String,
+            amountFen: _toInt(r['total']),
+          ),
+        )
+        .toList();
   }
 
-  Future<List<CategoryExpense>> getCategoryExpensesByMonth(String yearMonth) async {
+  Future<List<CategoryExpense>> getCategoryExpensesByMonth(
+    String yearMonth,
+  ) async {
     final startDate = '$yearMonth-01';
     final endDate = _getEndDate(yearMonth);
 
     final db = await _db.database;
-    final results = await db.rawQuery('''
+    final results = await db.rawQuery(
+      '''
       SELECT
         COALESCE(p.id, c.id) as category_id,
         COALESCE(p.name, c.name) as category_name,
@@ -538,15 +666,21 @@ class TransactionDao {
         AND t.transaction_date <= ?
       GROUP BY COALESCE(p.id, c.id)
       ORDER BY total_fen DESC
-    ''', [startDate, endDate]);
+    ''',
+      [startDate, endDate],
+    );
 
-    return results.map((r) => CategoryExpense(
-          categoryId: r['category_id'] as int,
-          categoryName: r['category_name'] as String,
-          icon: (r['category_icon'] as String?) ?? '📌',
-          color: (r['category_color'] as String?) ?? '#B7B7A4',
-          totalFen: _toInt(r['total_fen'] ?? 0),
-        )).toList();
+    return results
+        .map(
+          (r) => CategoryExpense(
+            categoryId: r['category_id'] as int,
+            categoryName: r['category_name'] as String,
+            icon: (r['category_icon'] as String?) ?? '📌',
+            color: (r['category_color'] as String?) ?? '#B7B7A4',
+            totalFen: _toInt(r['total_fen'] ?? 0),
+          ),
+        )
+        .toList();
   }
 
   Future<List<TransactionModel>> search(String keyword) async {
@@ -563,7 +697,9 @@ class TransactionDao {
   Future<int> getMonthTotalIncome() async {
     final now = DateTime.now();
     final startDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
-    final endDate = _getEndDate('${now.year}-${now.month.toString().padLeft(2, '0')}');
+    final endDate = _getEndDate(
+      '${now.year}-${now.month.toString().padLeft(2, '0')}',
+    );
 
     final db = await _db.database;
     final result = await db.rawQuery(
@@ -576,7 +712,9 @@ class TransactionDao {
   Future<int> getMonthTransactionCount() async {
     final now = DateTime.now();
     final startDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
-    final endDate = _getEndDate('${now.year}-${now.month.toString().padLeft(2, '0')}');
+    final endDate = _getEndDate(
+      '${now.year}-${now.month.toString().padLeft(2, '0')}',
+    );
 
     final db = await _db.database;
     final result = await db.rawQuery(
@@ -589,41 +727,68 @@ class TransactionDao {
   /// 获取某年各月支出汇总
   Future<List<MonthlyTotal>> getYearMonthlyExpenses(int year) async {
     final db = await _db.database;
-    final results = await db.rawQuery('''
+    final results = await db.rawQuery(
+      '''
       SELECT SUBSTR(transaction_date, 6, 2) as month, SUM(amount_fen) as total
       FROM transactions
       WHERE is_deleted = 0 AND type = 'expense' AND transaction_date >= ? AND transaction_date <= ?
       GROUP BY month ORDER BY month
-    ''', ['$year-01-01', '$year-12-31']);
-    return results.map((r) => MonthlyTotal(month: int.parse(r['month'] as String), totalFen: _toInt(r['total']))).toList();
+    ''',
+      ['$year-01-01', '$year-12-31'],
+    );
+    return results
+        .map(
+          (r) => MonthlyTotal(
+            month: int.parse(r['month'] as String),
+            totalFen: _toInt(r['total']),
+          ),
+        )
+        .toList();
   }
 
   Future<List<MonthlyTotal>> getYearMonthlyIncome(int year) async {
     final db = await _db.database;
-    final results = await db.rawQuery('''
+    final results = await db.rawQuery(
+      '''
       SELECT SUBSTR(transaction_date, 6, 2) as month, SUM(amount_fen) as total
       FROM transactions
       WHERE is_deleted = 0 AND type = 'income' AND transaction_date >= ? AND transaction_date <= ?
       GROUP BY month ORDER BY month
-    ''', ['$year-01-01', '$year-12-31']);
-    return results.map((r) => MonthlyTotal(month: int.parse(r['month'] as String), totalFen: _toInt(r['total']))).toList();
+    ''',
+      ['$year-01-01', '$year-12-31'],
+    );
+    return results
+        .map(
+          (r) => MonthlyTotal(
+            month: int.parse(r['month'] as String),
+            totalFen: _toInt(r['total']),
+          ),
+        )
+        .toList();
   }
 
   Future<int> getYearTotalExpense(int year) async {
     final db = await _db.database;
-    final r = await db.rawQuery('SELECT COALESCE(SUM(amount_fen), 0) as t FROM transactions WHERE is_deleted = 0 AND type = ? AND transaction_date >= ? AND transaction_date <= ?', ['expense', '$year-01-01', '$year-12-31']);
+    final r = await db.rawQuery(
+      'SELECT COALESCE(SUM(amount_fen), 0) as t FROM transactions WHERE is_deleted = 0 AND type = ? AND transaction_date >= ? AND transaction_date <= ?',
+      ['expense', '$year-01-01', '$year-12-31'],
+    );
     return _toInt(r.first['t']);
   }
 
   Future<int> getYearTotalIncome(int year) async {
     final db = await _db.database;
-    final r = await db.rawQuery('SELECT COALESCE(SUM(amount_fen), 0) as t FROM transactions WHERE is_deleted = 0 AND type = ? AND transaction_date >= ? AND transaction_date <= ?', ['income', '$year-01-01', '$year-12-31']);
+    final r = await db.rawQuery(
+      'SELECT COALESCE(SUM(amount_fen), 0) as t FROM transactions WHERE is_deleted = 0 AND type = ? AND transaction_date >= ? AND transaction_date <= ?',
+      ['income', '$year-01-01', '$year-12-31'],
+    );
     return _toInt(r.first['t']);
   }
 
   Future<List<CategoryExpense>> getYearCategoryExpenses(int year) async {
     final db = await _db.database;
-    final results = await db.rawQuery('''
+    final results = await db.rawQuery(
+      '''
       SELECT COALESCE(p.id, c.id) as category_id, COALESCE(p.name, c.name) as category_name,
              COALESCE(p.icon, c.icon) as category_icon, COALESCE(p.color, c.color) as category_color,
              SUM(t.amount_fen) as total_fen
@@ -632,20 +797,35 @@ class TransactionDao {
       LEFT JOIN categories p ON c.parent_id = p.id
       WHERE t.is_deleted = 0 AND t.type = 'expense' AND t.transaction_date >= ? AND t.transaction_date <= ?
       GROUP BY COALESCE(p.id, c.id) ORDER BY total_fen DESC
-    ''', ['$year-01-01', '$year-12-31']);
-    return results.map((r) => CategoryExpense(categoryId: r['category_id'] as int, categoryName: r['category_name'] as String, icon: (r['category_icon'] as String?) ?? '📌', color: (r['category_color'] as String?) ?? '#B7B7A4', totalFen: _toInt(r['total_fen'] ?? 0))).toList();
+    ''',
+      ['$year-01-01', '$year-12-31'],
+    );
+    return results
+        .map(
+          (r) => CategoryExpense(
+            categoryId: r['category_id'] as int,
+            categoryName: r['category_name'] as String,
+            icon: (r['category_icon'] as String?) ?? '📌',
+            color: (r['category_color'] as String?) ?? '#B7B7A4',
+            totalFen: _toInt(r['total_fen'] ?? 0),
+          ),
+        )
+        .toList();
   }
 
   Future<double> getYearAvgDailyExpense(int year) async {
     final total = await getYearTotalExpense(year);
     final now = DateTime.now();
-    final daysInYear = year == now.year ? DateTime.now().difference(DateTime(year, 1, 1)).inDays + 1 : 365;
+    final daysInYear = year == now.year
+        ? DateTime.now().difference(DateTime(year, 1, 1)).inDays + 1
+        : 365;
     return daysInYear > 0 ? total / daysInYear : 0;
   }
 
   Future<Map<String, String>> getYearMonthlyMaxCategory(int year) async {
     final db = await _db.database;
-    final results = await db.rawQuery('''
+    final results = await db.rawQuery(
+      '''
       SELECT month, category_name, max_total FROM (
         SELECT SUBSTR(t.transaction_date, 6, 2) as month, COALESCE(p.name, c.name) as category_name,
                SUM(t.amount_fen) as total, MAX(SUM(t.amount_fen)) OVER (PARTITION BY SUBSTR(t.transaction_date, 6, 2)) as max_total
@@ -655,9 +835,13 @@ class TransactionDao {
         WHERE t.is_deleted = 0 AND t.type = 'expense' AND t.transaction_date >= ? AND t.transaction_date <= ?
         GROUP BY month, COALESCE(p.name, c.name)
       ) WHERE total = max_total
-    ''', ['$year-01-01', '$year-12-31']);
+    ''',
+      ['$year-01-01', '$year-12-31'],
+    );
     final map = <String, String>{};
-    for (final r in results) { map[r['month'] as String] = r['category_name'] as String; }
+    for (final r in results) {
+      map[r['month'] as String] = r['category_name'] as String;
+    }
     return map;
   }
 
@@ -698,7 +882,11 @@ class BudgetDao {
   }) async {
     final db = await _db.database;
     // 先删除同类型同月份旧预算
-    await db.delete('budgets', where: 'category_id IS ? AND year_month = ?', whereArgs: [categoryId, yearMonth]);
+    await db.delete(
+      'budgets',
+      where: 'category_id IS ? AND year_month = ?',
+      whereArgs: [categoryId, yearMonth],
+    );
     // 插入新预算
     await db.insert('budgets', {
       'category_id': categoryId,
@@ -712,17 +900,22 @@ class BudgetDao {
 
   Future<int?> getBudget({int? categoryId, required String yearMonth}) async {
     final db = await _db.database;
-    final rows = await db.query('budgets',
-        where: 'category_id IS ? AND year_month = ? AND is_active = 1',
-        whereArgs: [categoryId, yearMonth]);
+    final rows = await db.query(
+      'budgets',
+      where: 'category_id IS ? AND year_month = ? AND is_active = 1',
+      whereArgs: [categoryId, yearMonth],
+    );
     if (rows.isEmpty) return null;
     return rows.first['amount_fen'] as int;
   }
 
   Future<Map<int?, int>> getAllBudgets(String yearMonth) async {
     final db = await _db.database;
-    final rows = await db.query('budgets',
-        where: 'year_month = ? AND is_active = 1', whereArgs: [yearMonth]);
+    final rows = await db.query(
+      'budgets',
+      where: 'year_month = ? AND is_active = 1',
+      whereArgs: [yearMonth],
+    );
     final result = <int?, int>{};
     for (final r in rows) {
       result[r['category_id'] as int?] = r['amount_fen'] as int;
@@ -730,9 +923,16 @@ class BudgetDao {
     return result;
   }
 
-  Future<void> deleteBudget({int? categoryId, required String yearMonth}) async {
+  Future<void> deleteBudget({
+    int? categoryId,
+    required String yearMonth,
+  }) async {
     final db = await _db.database;
-    await db.delete('budgets', where: 'category_id IS ? AND year_month = ?', whereArgs: [categoryId, yearMonth]);
+    await db.delete(
+      'budgets',
+      where: 'category_id IS ? AND year_month = ?',
+      whereArgs: [categoryId, yearMonth],
+    );
   }
 }
 
@@ -750,10 +950,13 @@ class AccountDao {
 
   Future<int> insert(String name, String type, {int initialBalance = 0}) async {
     final db = await _db.database;
-    final maxOrder = await db.rawQuery('SELECT MAX(sort_order) as m FROM accounts');
+    final maxOrder = await db.rawQuery(
+      'SELECT MAX(sort_order) as m FROM accounts',
+    );
     final order = ((maxOrder.first['m'] as int?) ?? 0) + 1;
     return db.insert('accounts', {
-      'name': name, 'type': type,
+      'name': name,
+      'type': type,
       'initial_balance_fen': initialBalance,
       'sort_order': order,
       'created_at': DateTime.now().toIso8601String(),
@@ -763,12 +966,22 @@ class AccountDao {
 
   Future<int> update(int id, String name) async {
     final db = await _db.database;
-    return db.update('accounts', {'name': name, 'updated_at': DateTime.now().toIso8601String()}, where: 'id = ?', whereArgs: [id]);
+    return db.update(
+      'accounts',
+      {'name': name, 'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> softDelete(int id) async {
     final db = await _db.database;
-    return db.update('accounts', {'is_active': 0}, where: 'id = ?', whereArgs: [id]);
+    return db.update(
+      'accounts',
+      {'is_active': 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> seedDefaults() async {
@@ -804,12 +1017,22 @@ class ImportBatchDao {
     await db.insert('import_batches', batch.toMap());
   }
 
-  Future<void> updateStatus(String id, String status, {int? imported, int? skipped}) async {
+  Future<void> updateStatus(
+    String id,
+    String status, {
+    int? imported,
+    int? skipped,
+  }) async {
     final db = await _db.database;
     final updates = <String, dynamic>{'status': status};
     if (imported != null) updates['imported_count'] = imported;
     if (skipped != null) updates['skipped_count'] = skipped;
-    await db.update('import_batches', updates, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'import_batches',
+      updates,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<List<ImportBatch>> getAll() async {
@@ -828,15 +1051,22 @@ class ImportRuleDao {
 
   Future<List<ImportRule>> getBySource(String source) async {
     final db = await _db.database;
-    final maps = await db.query('import_rules',
-        where: 'source = ?', whereArgs: [source], orderBy: 'is_default DESC');
+    final maps = await db.query(
+      'import_rules',
+      where: 'source = ?',
+      whereArgs: [source],
+      orderBy: 'is_default DESC',
+    );
     return maps.map((m) => ImportRule.fromMap(m)).toList();
   }
 
   Future<ImportRule?> getDefault(String source) async {
     final db = await _db.database;
-    final maps = await db.query('import_rules',
-        where: 'source = ? AND is_default = 1', whereArgs: [source]);
+    final maps = await db.query(
+      'import_rules',
+      where: 'source = ? AND is_default = 1',
+      whereArgs: [source],
+    );
     if (maps.isEmpty) return null;
     return ImportRule.fromMap(maps.first);
   }
@@ -848,8 +1078,12 @@ class ImportRuleDao {
 
   Future<int> update(ImportRule rule) async {
     final db = await _db.database;
-    return db.update('import_rules', rule.toMap(),
-        where: 'id = ?', whereArgs: [rule.id]);
+    return db.update(
+      'import_rules',
+      rule.toMap(),
+      where: 'id = ?',
+      whereArgs: [rule.id],
+    );
   }
 
   Future<int> delete(int id) async {
@@ -867,8 +1101,11 @@ class RecurringTransactionDao {
 
   Future<List<RecurringTransaction>> getAllActive() async {
     final db = await _db.database;
-    final maps = await db.query('recurring_transactions',
-        where: 'is_active = 1', orderBy: 'next_due_date ASC');
+    final maps = await db.query(
+      'recurring_transactions',
+      where: 'is_active = 1',
+      orderBy: 'next_due_date ASC',
+    );
     return maps.map((m) => RecurringTransaction.fromMap(m)).toList();
   }
 
@@ -877,8 +1114,11 @@ class RecurringTransactionDao {
     final dateStr =
         '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     final db = await _db.database;
-    final maps = await db.query('recurring_transactions',
-        where: 'is_active = 1 AND next_due_date <= ?', whereArgs: [dateStr]);
+    final maps = await db.query(
+      'recurring_transactions',
+      where: 'is_active = 1 AND next_due_date <= ?',
+      whereArgs: [dateStr],
+    );
     return maps.map((m) => RecurringTransaction.fromMap(m)).toList();
   }
 
@@ -889,14 +1129,22 @@ class RecurringTransactionDao {
 
   Future<void> updateDueDate(int id, String nextDueDate) async {
     final db = await _db.database;
-    await db.update('recurring_transactions', {'next_due_date': nextDueDate},
-        where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'recurring_transactions',
+      {'next_due_date': nextDueDate},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> delete(int id) async {
     final db = await _db.database;
-    return db.update('recurring_transactions', {'is_active': 0},
-        where: 'id = ?', whereArgs: [id]);
+    return db.update(
+      'recurring_transactions',
+      {'is_active': 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }
 

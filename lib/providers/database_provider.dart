@@ -32,6 +32,8 @@ final importRuleDaoProvider = Provider<ImportRuleDao>((ref) {
 });
 
 /// 定期交易 DAO Provider
-final recurringTransactionDaoProvider = Provider<RecurringTransactionDao>((ref) {
+final recurringTransactionDaoProvider = Provider<RecurringTransactionDao>((
+  ref,
+) {
   return RecurringTransactionDao();
 });

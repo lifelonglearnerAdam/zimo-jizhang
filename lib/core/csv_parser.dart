@@ -22,7 +22,10 @@ class CsvParseResult {
 /// 跨平台兼容（Web + 桌面 + 移动端）
 class CsvParser {
   /// 从字节数组解析 CSV（适用于 Web 端 file_picker 返回值）
-  static Future<CsvParseResult> parse(Uint8List bytes, {String? fileName}) async {
+  static Future<CsvParseResult> parse(
+    Uint8List bytes, {
+    String? fileName,
+  }) async {
     // 自动检测编码
     String content;
     String encoding;
@@ -79,7 +82,10 @@ class CsvParser {
 
   /// 检测是否为 UTF-8 BOM
   static bool _isUtf8Bom(List<int> bytes) {
-    return bytes.length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+    return bytes.length >= 3 &&
+        bytes[0] == 0xEF &&
+        bytes[1] == 0xBB &&
+        bytes[2] == 0xBF;
   }
 
   /// 简单 GBK 检测

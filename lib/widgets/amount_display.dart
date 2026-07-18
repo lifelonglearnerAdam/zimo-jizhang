@@ -23,8 +23,8 @@ class AmountDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveColor = color ??
-        (type == 'income' ? AppColors.income : AppColors.expense);
+    final effectiveColor =
+        color ?? (type == 'income' ? AppColors.income : AppColors.expense);
 
     final prefix = type == 'expense' ? '-' : '';
 
@@ -32,30 +32,30 @@ class AmountDisplay extends StatelessWidget {
       '$prefix${MoneyUtils.fenToYuan(amountFen, showSymbol: showSymbol)}',
       style: switch (size) {
         AmountSize.small => TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: effectiveColor,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: effectiveColor,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
         AmountSize.medium => TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: effectiveColor,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: effectiveColor,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
         AmountSize.large => TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: effectiveColor,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: effectiveColor,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
         AmountSize.xlarge => TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w800,
-            color: effectiveColor,
-            letterSpacing: -1,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
+          fontSize: 36,
+          fontWeight: FontWeight.w800,
+          color: effectiveColor,
+          letterSpacing: 0,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
       },
     );
   }

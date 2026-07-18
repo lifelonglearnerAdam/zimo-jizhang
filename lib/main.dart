@@ -41,7 +41,11 @@ void main() async {
             const SizedBox(height: 12),
             const Text(
               '页面加载出错',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A1A2E)),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A2E),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -59,24 +63,25 @@ void main() async {
 
   // 如果初始化失败，显示错误页面
   if (_fatalError != null) {
-    runApp(MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(_fatalError!, style: const TextStyle(fontSize: 14, color: Colors.red)),
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                _fatalError!,
+                style: const TextStyle(fontSize: 14, color: Colors.red),
+              ),
+            ),
           ),
         ),
       ),
-    ));
+    );
     return;
   }
 
-  runApp(
-    const ProviderScope(
-      child: ZimoJizhangApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: ZimoJizhangApp()));
 }
 
 Future<void> _initWindowManager() async {

@@ -29,25 +29,32 @@ class AlipayParser {
 
         // 过滤退款、充值、提现
         final desc = description ?? '';
-        if (desc.contains('退款') || desc.contains('充值') || desc.contains('提现')) continue;
+        if (desc.contains('退款') || desc.contains('充值') || desc.contains('提现'))
+          continue;
 
-        entries.add(ParsedBillEntry(
-          date: _normalizeDate(dateStr),
-          type: type,
-          amountFen: (amount * 100).round(),
-          description: desc,
-          counterparty: counterparty ?? '',
-          paymentMethod: paymentMethod ?? '支付宝',
-          externalId: externalId,
-          source: 'alipay',
-        ));
+        entries.add(
+          ParsedBillEntry(
+            date: _normalizeDate(dateStr),
+            type: type,
+            amountFen: (amount * 100).round(),
+            description: desc,
+            counterparty: counterparty ?? '',
+            paymentMethod: paymentMethod ?? '支付宝',
+            externalId: externalId,
+            source: 'alipay',
+          ),
+        );
       } catch (_) {}
     }
 
     return entries;
   }
 
-  static String? _getField(List<String> headers, List<String> row, String name) {
+  static String? _getField(
+    List<String> headers,
+    List<String> row,
+    String name,
+  ) {
     final idx = headers.indexOf(name);
     if (idx < 0 || idx >= row.length) return null;
     final val = row[idx];

@@ -13,11 +13,31 @@ class WechatParser {
       try {
         final dateStr = CsvParser.getField(csv.headers, row, 'date', rule);
         final typeStr = CsvParser.getField(csv.headers, row, 'type', rule);
-        final counterparty = CsvParser.getField(csv.headers, row, 'counterparty', rule);
-        final description = CsvParser.getField(csv.headers, row, 'description', rule);
+        final counterparty = CsvParser.getField(
+          csv.headers,
+          row,
+          'counterparty',
+          rule,
+        );
+        final description = CsvParser.getField(
+          csv.headers,
+          row,
+          'description',
+          rule,
+        );
         final amountStr = CsvParser.getField(csv.headers, row, 'amount', rule);
-        final paymentMethod = CsvParser.getField(csv.headers, row, 'payment_method', rule);
-        final externalId = CsvParser.getField(csv.headers, row, 'external_id', rule);
+        final paymentMethod = CsvParser.getField(
+          csv.headers,
+          row,
+          'payment_method',
+          rule,
+        );
+        final externalId = CsvParser.getField(
+          csv.headers,
+          row,
+          'external_id',
+          rule,
+        );
 
         if (amountStr == null || dateStr == null) continue;
 
@@ -27,23 +47,26 @@ class WechatParser {
         if (amount == null) continue;
 
         // 微信 "收/支" 字段：支出→expense，收入→income
-        final isExpense = typeStr == null || typeStr.contains('支出') || typeStr == '支';
+        final isExpense =
+            typeStr == null || typeStr.contains('支出') || typeStr == '支';
         final type = isExpense ? 'expense' : 'income';
 
         // 过滤微信红包和转账
         final desc = description ?? '';
         if (desc.contains('微信红包') || desc.contains('转账')) continue;
 
-        entries.add(ParsedBillEntry(
-          date: _normalizeDate(dateStr),
-          type: type,
-          amountFen: (amount * 100).round(),
-          description: desc,
-          counterparty: counterparty ?? '',
-          paymentMethod: paymentMethod ?? '微信',
-          externalId: externalId,
-          source: 'wechat',
-        ));
+        entries.add(
+          ParsedBillEntry(
+            date: _normalizeDate(dateStr),
+            type: type,
+            amountFen: (amount * 100).round(),
+            description: desc,
+            counterparty: counterparty ?? '',
+            paymentMethod: paymentMethod ?? '微信',
+            externalId: externalId,
+            source: 'wechat',
+          ),
+        );
       } catch (_) {
         // 跳过格式不对的行
       }
@@ -61,14 +84,14 @@ class WechatParser {
   }
 
   static Map<String, String> _defaultRule() => {
-        'date': '交易时间',
-        'type': '收/支',
-        'counterparty': '交易对方',
-        'description': '商品',
-        'amount': '金额(元)',
-        'payment_method': '支付方式',
-        'external_id': '交易单号',
-      };
+    'date': '交易时间',
+    'type': '收/支',
+    'counterparty': '交易对方',
+    'description': '商品',
+    'amount': '金额(元)',
+    'payment_method': '支付方式',
+    'external_id': '交易单号',
+  };
 }
 
 /// 解析后的账单条目

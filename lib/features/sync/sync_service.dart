@@ -16,19 +16,23 @@ class SyncService {
   /// 导出所有交易为 JSON
   Future<String> exportToJson() async {
     final txs = await txDao.getAll(limit: 10000);
-    final data = txs.map((t) => {
-          'id': t.id,
-          'amount_fen': t.amountFen,
-          'type': t.type,
-          'category_id': t.categoryId,
-          'transaction_date': t.transactionDate,
-          'description': t.description,
-          'counterparty': t.counterparty,
-          'payment_method': t.paymentMethod,
-          'source': t.source,
-          'external_id': t.externalId,
-          'updated_at': t.updatedAt.toIso8601String(),
-        }).toList();
+    final data = txs
+        .map(
+          (t) => {
+            'id': t.id,
+            'amount_fen': t.amountFen,
+            'type': t.type,
+            'category_id': t.categoryId,
+            'transaction_date': t.transactionDate,
+            'description': t.description,
+            'counterparty': t.counterparty,
+            'payment_method': t.paymentMethod,
+            'source': t.source,
+            'external_id': t.externalId,
+            'updated_at': t.updatedAt.toIso8601String(),
+          },
+        )
+        .toList();
 
     final json = const JsonEncoder.withIndent('  ').convert({
       'version': 1,
@@ -67,20 +71,22 @@ class SyncService {
         final existingTx = existing.firstWhere((t) => t.id == id);
         final newUpdatedAt = DateTime.parse(txMap['updated_at'] as String);
         if (newUpdatedAt.isAfter(existingTx.updatedAt)) {
-          await txDao.update(TransactionModel(
-            id: id,
-            amountFen: txMap['amount_fen'] as int,
-            type: txMap['type'] as String? ?? 'expense',
-            categoryId: txMap['category_id'] as int?,
-            transactionDate: txMap['transaction_date'] as String,
-            description: txMap['description'] as String?,
-            counterparty: txMap['counterparty'] as String?,
-            paymentMethod: txMap['payment_method'] as String?,
-            source: txMap['source'] as String? ?? 'import',
-            externalId: txMap['external_id'] as String?,
-            createdAt: existingTx.createdAt,
-            updatedAt: DateTime.now(),
-          ));
+          await txDao.update(
+            TransactionModel(
+              id: id,
+              amountFen: txMap['amount_fen'] as int,
+              type: txMap['type'] as String? ?? 'expense',
+              categoryId: txMap['category_id'] as int?,
+              transactionDate: txMap['transaction_date'] as String,
+              description: txMap['description'] as String?,
+              counterparty: txMap['counterparty'] as String?,
+              paymentMethod: txMap['payment_method'] as String?,
+              source: txMap['source'] as String? ?? 'import',
+              externalId: txMap['external_id'] as String?,
+              createdAt: existingTx.createdAt,
+              updatedAt: DateTime.now(),
+            ),
+          );
           imported++;
         } else {
           skipped++;
@@ -110,7 +116,11 @@ class SyncService {
   }
 
   /// WebDAV 上传
-  Future<bool> uploadToWebdav(String url, String username, String password) async {
+  Future<bool> uploadToWebdav(
+    String url,
+    String username,
+    String password,
+  ) async {
     try {
       final json = await exportToJson();
       final auth = base64Encode(utf8.encode('$username:$password'));
@@ -122,14 +132,20 @@ class SyncService {
         },
         body: json,
       );
-      return response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204;
+      return response.statusCode == 200 ||
+          response.statusCode == 201 ||
+          response.statusCode == 204;
     } catch (_) {
       return false;
     }
   }
 
   /// WebDAV 下载
-  Future<String?> downloadFromWebdav(String url, String username, String password) async {
+  Future<String?> downloadFromWebdav(
+    String url,
+    String username,
+    String password,
+  ) async {
     try {
       final auth = base64Encode(utf8.encode('$username:$password'));
       final response = await http.get(

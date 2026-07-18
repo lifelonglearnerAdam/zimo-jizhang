@@ -28,10 +28,7 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              icon,
-              style: TextStyle(fontSize: iconSize),
-            ),
+            Text(icon, style: TextStyle(fontSize: iconSize)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -55,10 +52,7 @@ class EmptyState extends StatelessWidget {
             ],
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: onAction,
-                child: Text(actionLabel!),
-              ),
+              ElevatedButton(onPressed: onAction, child: Text(actionLabel!)),
             ],
           ],
         ),

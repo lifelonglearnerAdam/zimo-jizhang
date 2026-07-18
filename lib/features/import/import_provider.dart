@@ -65,7 +65,11 @@ class ImportNotifier extends StateNotifier<ImportState> {
   ImportNotifier(this._ref) : super(const ImportState());
 
   /// 解析文件（从字节数据）
-  Future<void> parseFile(Uint8List bytes, String fileName, String source) async {
+  Future<void> parseFile(
+    Uint8List bytes,
+    String fileName,
+    String source,
+  ) async {
     state = state.copyWith(isParsing: true, source: source, error: null);
 
     try {
@@ -91,7 +95,8 @@ class ImportNotifier extends StateNotifier<ImportState> {
       final existingDates = <String, Set<String>>{};
       final allExisting = await txDao.getAll(limit: 1000);
       for (final tx in allExisting) {
-        final key = '${tx.transactionDate}_${tx.amountFen}_${tx.counterparty ?? ''}';
+        final key =
+            '${tx.transactionDate}_${tx.amountFen}_${tx.counterparty ?? ''}';
         existingDates.putIfAbsent(tx.transactionDate, () => {}).add(key);
       }
 
@@ -110,17 +115,19 @@ class ImportNotifier extends StateNotifier<ImportState> {
         // 数据库去重
         final isDuplicate = existingDates[e.date]?.contains(dupKey) ?? false;
 
-        previews.add(ImportPreviewEntry(
-          index: i,
-          date: e.date,
-          type: e.type,
-          amountFen: e.amountFen,
-          description: e.description,
-          counterparty: e.counterparty,
-          paymentMethod: e.paymentMethod,
-          isDuplicate: isDuplicate,
-          externalId: e.externalId,
-        ));
+        previews.add(
+          ImportPreviewEntry(
+            index: i,
+            date: e.date,
+            type: e.type,
+            amountFen: e.amountFen,
+            description: e.description,
+            counterparty: e.counterparty,
+            paymentMethod: e.paymentMethod,
+            isDuplicate: isDuplicate,
+            externalId: e.externalId,
+          ),
+        );
       }
 
       state = state.copyWith(
@@ -167,8 +174,12 @@ class ImportNotifier extends StateNotifier<ImportState> {
           amountFen: entry.amountFen,
           categoryId: categoryId,
           date: entry.date,
-          description: entry.description.isNotEmpty ? entry.description : entry.counterparty,
-          paymentMethod: entry.paymentMethod.isNotEmpty ? entry.paymentMethod : null,
+          description: entry.description.isNotEmpty
+              ? entry.description
+              : entry.counterparty,
+          paymentMethod: entry.paymentMethod.isNotEmpty
+              ? entry.paymentMethod
+              : null,
           type: entry.type,
         );
         imported++;
@@ -196,6 +207,8 @@ class ImportNotifier extends StateNotifier<ImportState> {
 }
 
 /// Provider
-final importProvider = StateNotifierProvider<ImportNotifier, ImportState>((ref) {
+final importProvider = StateNotifierProvider<ImportNotifier, ImportState>((
+  ref,
+) {
   return ImportNotifier(ref);
 });

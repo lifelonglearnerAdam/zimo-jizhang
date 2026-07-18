@@ -3,7 +3,9 @@ import '../data/models.dart';
 import 'database_provider.dart';
 
 /// 今日交易记录
-final todayTransactionsProvider = FutureProvider<List<TransactionModel>>((ref) async {
+final todayTransactionsProvider = FutureProvider<List<TransactionModel>>((
+  ref,
+) async {
   final dao = ref.watch(transactionDaoProvider);
   return dao.getToday();
 });
@@ -39,7 +41,9 @@ final monthCountProvider = FutureProvider<int>((ref) async {
 });
 
 /// 本月按大类支出汇总
-final categoryExpensesProvider = FutureProvider<List<CategoryExpense>>((ref) async {
+final categoryExpensesProvider = FutureProvider<List<CategoryExpense>>((
+  ref,
+) async {
   final now = DateTime.now();
   final yearMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
   final dao = ref.watch(transactionDaoProvider);
@@ -48,44 +52,67 @@ final categoryExpensesProvider = FutureProvider<List<CategoryExpense>>((ref) asy
 
 /// 某月交易记录
 final monthTransactionsProvider =
-    FutureProvider.family<List<TransactionModel>, String>((ref, yearMonth) async {
-  final dao = ref.watch(transactionDaoProvider);
-  return dao.getByMonth(yearMonth);
-});
+    FutureProvider.family<List<TransactionModel>, String>((
+      ref,
+      yearMonth,
+    ) async {
+      final dao = ref.watch(transactionDaoProvider);
+      return dao.getByMonth(yearMonth);
+    });
 
 /// 所有交易记录
 final allTransactionsProvider =
     FutureProvider.autoDispose<List<TransactionModel>>((ref) async {
+      final dao = ref.watch(transactionDaoProvider);
+      return dao.getAll(limit: 100);
+    });
+
+/// 首页近期记录，和明细页的筛选状态相互独立。
+final recentTransactionsProvider = FutureProvider<List<TransactionModel>>((
+  ref,
+) async {
   final dao = ref.watch(transactionDaoProvider);
-  return dao.getAll(limit: 100);
+  return dao.getAll(limit: 12);
 });
 
 /// 交易记录管理 Notifier
 final transactionListNotifierProvider =
     StateNotifierProvider<TransactionListNotifier, TransactionListState>((ref) {
-  return TransactionListNotifier(ref);
-});
+      return TransactionListNotifier(ref);
+    });
 
 class TransactionListState {
   final List<TransactionModel> transactions;
   final bool isLoading;
   final String? error;
+  final String? yearMonth;
+  final String typeFilter;
+  final String keyword;
 
   const TransactionListState({
     this.transactions = const [],
     this.isLoading = false,
     this.error,
+    this.yearMonth,
+    this.typeFilter = 'all',
+    this.keyword = '',
   });
 
   TransactionListState copyWith({
     List<TransactionModel>? transactions,
     bool? isLoading,
     String? error,
+    String? yearMonth,
+    String? typeFilter,
+    String? keyword,
   }) {
     return TransactionListState(
       transactions: transactions ?? this.transactions,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      yearMonth: yearMonth ?? this.yearMonth,
+      typeFilter: typeFilter ?? this.typeFilter,
+      keyword: keyword ?? this.keyword,
     );
   }
 }
@@ -98,7 +125,7 @@ class TransactionListNotifier extends StateNotifier<TransactionListState> {
   }
 
   Future<void> loadTransactions() async {
-    state = state.copyWith(isLoading: true);
+    state = const TransactionListState(isLoading: true);
     try {
       final dao = _ref.read(transactionDaoProvider);
       final txs = await dao.getAll(limit: 100);
@@ -129,51 +156,93 @@ class TransactionListNotifier extends StateNotifier<TransactionListState> {
       type: type,
     );
 
-    await loadTransactions();
-    _ref.invalidate(todayTransactionsProvider);
-    _ref.invalidate(todayTotalProvider);
-    _ref.invalidate(monthTotalProvider);
-    _ref.invalidate(monthIncomeProvider);
-    _ref.invalidate(monthCountProvider);
-    _ref.invalidate(categoryExpensesProvider);
+    await _reloadCurrentView();
+    _invalidateTransactionData();
+  }
+
+  Future<void> updateTransaction(TransactionModel transaction) async {
+    final dao = _ref.read(transactionDaoProvider);
+    await dao.update(transaction);
+    await _reloadCurrentView();
+    _invalidateTransactionData();
   }
 
   Future<void> deleteTransaction(String id) async {
     final dao = _ref.read(transactionDaoProvider);
     await dao.softDelete(id);
-    await loadTransactions();
+    await _reloadCurrentView();
+    _invalidateTransactionData();
+  }
+
+  Future<void> restoreTransaction(String id) async {
+    final dao = _ref.read(transactionDaoProvider);
+    await dao.restore(id);
+    await _reloadCurrentView();
+    _invalidateTransactionData();
+  }
+
+  Future<void> search(String keyword) async {
+    await applyFilters(
+      yearMonth: state.yearMonth,
+      type: state.typeFilter,
+      keyword: keyword,
+    );
+  }
+
+  Future<void> applyFilters({
+    required String? yearMonth,
+    String type = 'all',
+    String keyword = '',
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final dao = _ref.read(transactionDaoProvider);
+      final txs = await dao.getFiltered(
+        yearMonth: yearMonth,
+        type: type,
+        keyword: keyword,
+      );
+      state = TransactionListState(
+        transactions: txs,
+        yearMonth: yearMonth,
+        typeFilter: type,
+        keyword: keyword,
+      );
+    } catch (e) {
+      state = TransactionListState(
+        error: e.toString(),
+        yearMonth: yearMonth,
+        typeFilter: type,
+        keyword: keyword,
+      );
+    }
+  }
+
+  Future<void> loadByMonth(String yearMonth) async {
+    await applyFilters(yearMonth: yearMonth);
+  }
+
+  Future<void> _reloadCurrentView() async {
+    if (state.yearMonth != null) {
+      await applyFilters(
+        yearMonth: state.yearMonth!,
+        type: state.typeFilter,
+        keyword: state.keyword,
+      );
+    } else {
+      await loadTransactions();
+    }
+  }
+
+  void _invalidateTransactionData() {
     _ref.invalidate(todayTransactionsProvider);
     _ref.invalidate(todayTotalProvider);
     _ref.invalidate(monthTotalProvider);
     _ref.invalidate(monthIncomeProvider);
     _ref.invalidate(monthCountProvider);
     _ref.invalidate(categoryExpensesProvider);
-  }
-
-  Future<void> search(String keyword) async {
-    if (keyword.isEmpty) {
-      await loadTransactions();
-      return;
-    }
-    state = state.copyWith(isLoading: true);
-    try {
-      final dao = _ref.read(transactionDaoProvider);
-      final txs = await dao.search(keyword);
-      state = TransactionListState(transactions: txs);
-    } catch (e) {
-      state = TransactionListState(error: e.toString());
-    }
-  }
-
-  Future<void> loadByMonth(String yearMonth) async {
-    state = state.copyWith(isLoading: true);
-    try {
-      final dao = _ref.read(transactionDaoProvider);
-      final txs = await dao.getByMonth(yearMonth);
-      state = TransactionListState(transactions: txs);
-    } catch (e) {
-      state = TransactionListState(error: e.toString());
-    }
+    _ref.invalidate(allTransactionsProvider);
+    _ref.invalidate(recentTransactionsProvider);
   }
 }
 
