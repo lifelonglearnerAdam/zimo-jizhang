@@ -38,4 +38,4 @@ Flutter、Riverpod、SQLite（sqflite）、go_router、fl_chart。
 
 ## 版本
 
-当前版本：`2.0.0+3`
+当前版本：`2.0.1+4`

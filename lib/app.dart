@@ -325,7 +325,7 @@ class _DesktopSidebar extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 10),
             child: Text(
-              '版本 2.0.0',
+              '版本 2.0.1',
               style: TextStyle(fontSize: 11, color: AppColors.textHint),
             ),
           ),

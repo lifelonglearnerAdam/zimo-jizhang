@@ -136,7 +136,7 @@ class SettingsPage extends ConsumerWidget {
               '子墨记账 2.0',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
-            subtitle: const Text('本地存储 · 不上传账目 · 版本 2.0.0'),
+            subtitle: const Text('本地存储 · 不上传账目 · 版本 2.0.1'),
           ),
         ]),
       ],

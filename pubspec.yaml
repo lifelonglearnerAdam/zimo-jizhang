@@ -1,7 +1,7 @@
 name: zimo_jizhang
 description: "子墨记账 - 本地优先的全平台个人记账应用"
 publish_to: 'none'
-version: 2.0.0+3
+version: 2.0.1+4
 
 environment:
   sdk: ^3.10.7

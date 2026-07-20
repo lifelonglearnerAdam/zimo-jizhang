@@ -50,7 +50,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           const SizedBox(height: 12),
           _buildCategoryPreview(),
           const SizedBox(height: 16),
-          _sectionTitle('近期记录', action: () => context.go('/transactions')),
+          _sectionTitle(
+            '近期记录（最近 ${recent.valueOrNull?.length ?? 12} 笔）',
+            action: () => context.go('/transactions'),
+            actionLabel: '全部明细',
+          ),
           recent.when(
             data: (transactions) => transactions.isEmpty
                 ? _emptyHint()
@@ -385,7 +389,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  Widget _sectionTitle(String title, {VoidCallback? action}) {
+  Widget _sectionTitle(
+    String title, {
+    VoidCallback? action,
+    String actionLabel = '查看全部',
+  }) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
       child: Row(
@@ -399,7 +407,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             TextButton.icon(
               onPressed: action,
               icon: const Icon(Icons.arrow_forward_rounded, size: 15),
-              label: const Text('查看全部', style: TextStyle(fontSize: 12)),
+              label: Text(actionLabel, style: const TextStyle(fontSize: 12)),
             ),
         ],
       ),
