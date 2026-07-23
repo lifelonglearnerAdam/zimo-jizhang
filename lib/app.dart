@@ -9,12 +9,15 @@ import 'features/add_transaction/add_transaction_dialog.dart';
 import 'features/budget/budget_page.dart';
 import 'features/dashboard/dashboard_page.dart';
 import 'features/import/import_page.dart';
+import 'features/learning/article_detail_page.dart';
+import 'features/learning/learning_page.dart';
 import 'features/ocr/ocr_page.dart';
 import 'features/recurring/recurring_page.dart';
 import 'features/statistics/statistics_page.dart';
 import 'features/sync/sync_page.dart';
 import 'features/transaction_list/transaction_list_page.dart';
 import 'features/settings/settings_page.dart';
+import 'features/wealth/wealth_page.dart';
 import 'providers/theme_provider.dart';
 import 'providers/transaction_provider.dart';
 
@@ -31,9 +34,16 @@ final _routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const TransactionListPage(),
           ),
           GoRoute(path: '/stats', builder: (_, __) => const StatisticsPage()),
+          GoRoute(path: '/wealth', builder: (_, __) => const WealthPage()),
+          GoRoute(path: '/learn', builder: (_, __) => const LearningPage()),
           GoRoute(path: '/budget', builder: (_, __) => const BudgetPage()),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsPage()),
         ],
+      ),
+      GoRoute(
+        path: '/learn/:id',
+        builder: (_, state) =>
+            ArticleDetailPage(articleId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(path: '/import', builder: (_, __) => const ImportPage()),
       GoRoute(path: '/sync', builder: (_, __) => const SyncPage()),
@@ -82,13 +92,20 @@ class _AppShellState extends ConsumerState<AppShell> {
       '明细',
       '/transactions',
     ),
-    (Icons.pie_chart_outline_rounded, Icons.pie_chart_rounded, '统计', '/stats'),
-    (Icons.savings_outlined, Icons.savings_rounded, '预算', '/budget'),
-    (Icons.settings_outlined, Icons.settings_rounded, '设置', '/settings'),
+    (Icons.insights_outlined, Icons.insights_rounded, '分析', '/stats'),
+    (
+      Icons.account_balance_wallet_outlined,
+      Icons.account_balance_wallet_rounded,
+      '财富',
+      '/wealth',
+    ),
+    (Icons.school_outlined, Icons.school_rounded, '学习', '/learn'),
   ];
 
   int get _selectedIndex {
     final path = GoRouterState.of(context).uri.path;
+    if (path == '/budget') return 3;
+    if (path.startsWith('/learn')) return 4;
     final index = _destinations.indexWhere((item) => item.$4 == path);
     return index < 0 ? 0 : index;
   }
@@ -98,6 +115,12 @@ class _AppShellState extends ConsumerState<AppShell> {
     final isDesktop =
         MediaQuery.sizeOf(context).width >= AppConstants.breakpointWidth;
     final selectedIndex = _selectedIndex;
+    final path = GoRouterState.of(context).uri.path;
+    final pageTitle = path == '/settings'
+        ? '设置'
+        : path == '/budget'
+        ? '预算'
+        : _destinations[selectedIndex].$3;
 
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
@@ -115,10 +138,16 @@ class _AppShellState extends ConsumerState<AppShell> {
                     children: [
                       _BrandMark(size: 30),
                       const SizedBox(width: 9),
-                      Text(_destinations[selectedIndex].$3),
+                      Text(pageTitle),
                     ],
                   ),
                   actions: [
+                    if (path != '/settings')
+                      IconButton(
+                        tooltip: '设置',
+                        onPressed: () => context.push('/settings'),
+                        icon: const Icon(Icons.settings_outlined),
+                      ),
                     IconButton(
                       tooltip: '记一笔',
                       onPressed: _openAddDialog,
@@ -152,7 +181,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                       ),
                   ],
                 ),
-          floatingActionButton: isDesktop || selectedIndex > 1
+          floatingActionButton:
+              isDesktop || (path != '/' && path != '/transactions')
               ? null
               : FloatingActionButton.extended(
                   onPressed: _openAddDialog,
@@ -293,6 +323,18 @@ class _DesktopSidebar extends StatelessWidget {
             );
           }),
           const Spacer(),
+          ListTile(
+            dense: true,
+            selected: GoRouterState.of(context).uri.path == '/settings',
+            selectedTileColor: AppColors.primaryLightest,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            leading: const Icon(Icons.settings_outlined, size: 20),
+            title: const Text('设置', style: TextStyle(fontSize: 14)),
+            onTap: () => context.push('/settings'),
+          ),
+          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -325,7 +367,7 @@ class _DesktopSidebar extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 10),
             child: Text(
-              '版本 2.0.1',
+              '版本 2.1.0',
               style: TextStyle(fontSize: 11, color: AppColors.textHint),
             ),
           ),

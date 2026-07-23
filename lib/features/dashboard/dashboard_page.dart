@@ -4,10 +4,13 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../data/learning_content.dart';
 import '../../data/models.dart';
+import '../../providers/learning_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/budget_provider.dart';
+import '../../providers/wealth_provider.dart';
 import '../../widgets/amount_display.dart';
 import '../add_transaction/add_transaction_dialog.dart';
 
@@ -24,8 +27,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final monthTotal = ref.watch(monthTotalProvider);
     final monthIncome = ref.watch(monthIncomeProvider);
     final recent = ref.watch(recentTransactionsProvider);
+    final wealth = ref.watch(wealthSummaryProvider);
+    final todayLessonAsync = ref.watch(todayLearningProvider);
+    final learningProgress = ref.watch(learningProgressProvider).valueOrNull;
     final allCats = ref.watch(allCategoriesProvider).valueOrNull ?? [];
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final todayLesson = todayLessonAsync.valueOrNull;
+    final todayProgress =
+        todayLesson == null ? null : learningProgress?[todayLesson.id];
 
     return RefreshIndicator(
       color: AppColors.primary,
@@ -35,6 +44,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         ref.invalidate(todayTransactionsProvider);
         ref.invalidate(categoryExpensesProvider);
         ref.invalidate(recentTransactionsProvider);
+        ref.invalidate(wealthSummaryProvider);
+        ref.invalidate(learningProgressProvider);
+        ref.invalidate(learningCatalogProvider);
+        ref.invalidate(todayLearningProvider);
         await Future.delayed(const Duration(milliseconds: 300));
       },
       child: ListView(
@@ -45,6 +58,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           _buildHeader(),
           const SizedBox(height: 12),
           _buildSummaryCard(monthIncome, monthTotal),
+          const SizedBox(height: 10),
+          _buildInsightCards(
+            wealth,
+            todayLessonAsync,
+            todayProgress,
+          ),
           const SizedBox(height: 10),
           _buildBudgetBar(),
           const SizedBox(height: 12),
@@ -249,6 +268,143 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Widget get sz => const SizedBox.shrink();
+
+  Widget _buildInsightCards(
+    AsyncValue<WealthSummary> wealth,
+    AsyncValue<LearningArticle> todayLesson,
+    LearningProgress? progress,
+  ) {
+    final article = todayLesson.valueOrNull;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: _insightCard(
+              color: AppColors.primaryLightest,
+              iconColor: AppColors.primary,
+              icon: Icons.account_balance_wallet_outlined,
+              label: '净资产',
+              value: wealth.when(
+                data: (summary) => MoneyUtils.fenToShort(summary.netWorthFen),
+                loading: () => '计算中',
+                error: (_, __) => '--',
+              ),
+              actionLabel: '财富中心',
+              onTap: () => context.go('/wealth'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _insightCard(
+              color: AppColors.warningLight,
+              iconColor: AppColors.warning,
+              icon: progress?.completed == true
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.auto_stories_outlined,
+              label: article == null
+                  ? '每日一课'
+                  : '每日一课 · ${article.minutes} 分钟',
+              value: todayLesson.when(
+                data: (item) => item.title,
+                loading: () => '加载中…',
+                error: (_, __) => '暂时不可用',
+              ),
+              actionLabel: progress?.completed == true ? '今日已学' : '开始学习',
+              onTap: () {
+                if (article != null) {
+                  context.push('/learn/${article.id}');
+                } else {
+                  context.go('/learn');
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _insightCard({
+    required Color color,
+    required Color iconColor,
+    required IconData icon,
+    required String label,
+    required String value,
+    required String actionLabel,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: SizedBox(
+          height: 116,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, size: 18, color: iconColor),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      value,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Text(
+                      actionLabel,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: iconColor,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 12,
+                      color: iconColor,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildBudgetBar() {
     final now = DateTime.now();

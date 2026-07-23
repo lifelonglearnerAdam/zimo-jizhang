@@ -9,7 +9,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/file_saver.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
-import '../../data/models.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -90,6 +89,20 @@ class SettingsPage extends ConsumerWidget {
           ),
           _tool(
             context,
+            Icons.school_outlined,
+            '财商学习内容',
+            '导入专栏内容包、设置远程更新与自动检查',
+            () => context.push('/learn'),
+          ),
+          _tool(
+            context,
+            Icons.account_balance_wallet_outlined,
+            '财富中心',
+            '资产、负债、净资产与储蓄目标',
+            () => context.go('/wealth'),
+          ),
+          _tool(
+            context,
             Icons.download_outlined,
             '导出 CSV',
             '导出全部未删除记录，Excel 可打开',
@@ -133,10 +146,10 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
             title: const Text(
-              '子墨记账 2.0',
+              '子墨记账 2.1',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
-            subtitle: const Text('本地存储 · 不上传账目 · 版本 2.0.1'),
+            subtitle: const Text('本地存储 · 不上传账目 · 版本 2.1.0'),
           ),
         ]),
       ],
@@ -174,7 +187,7 @@ class SettingsPage extends ConsumerWidget {
     AsyncValue<List<Map<String, dynamic>>> accounts,
     bool isDark,
   ) {
-    return _section(context, '支付账户', '仅用于标记交易来源，不会影响已有账目', [
+    return _section(context, '财富账户', '余额用于净资产统计，不会修改已有账目', [
       accounts.when(
         data: (items) => Column(
           children: [

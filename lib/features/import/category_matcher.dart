@@ -3,9 +3,8 @@ import '../../data/database.dart';
 /// 智能分类匹配器 — 基于历史交易记录匹配分类
 class CategoryMatcher {
   final TransactionDao _txDao;
-  final CategoryDao _catDao;
 
-  CategoryMatcher(this._txDao, this._catDao);
+  CategoryMatcher(this._txDao);
 
   /// 根据交易对方 / 描述匹配最佳分类
   /// 返回 {categoryId, categoryName, confidence(0-100)}

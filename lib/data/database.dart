@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
+import 'learning_content.dart';
 import 'models.dart';
 import 'seed_data.dart';
 import 'database_config_native.dart'
@@ -33,7 +34,7 @@ class DatabaseService {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -97,6 +98,8 @@ class DatabaseService {
         name TEXT NOT NULL,
         type TEXT NOT NULL CHECK(type IN ('cash','wechat','alipay','bank_card','credit_card','other')),
         initial_balance_fen INTEGER DEFAULT 0,
+        balance_fen INTEGER DEFAULT 0,
+        include_in_net_worth INTEGER DEFAULT 1,
         sort_order INTEGER DEFAULT 0,
         is_active INTEGER DEFAULT 1,
         created_at TEXT DEFAULT (datetime('now', 'localtime')),
@@ -113,8 +116,14 @@ class DatabaseService {
     );
     await db.execute('CREATE INDEX idx_tx_type ON transactions(type)');
 
+    await _ensureOperationalTables(db);
+    await _ensureWealthTables(db);
+    await _ensureLearningTables(db);
+
     // 插入默认分类
     await _seedCategories(db);
+    await _seedImportRulesIfEmpty(db);
+    await _seedLearningArticlesIfEmpty(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -189,6 +198,168 @@ class DatabaseService {
       // 插入默认导入规则
       await _seedImportRules(db);
     }
+    if (oldVersion < 4) {
+      await _ensureOperationalTables(db);
+      await _ensureAccountColumns(db);
+      await _ensureWealthTables(db);
+      await _seedImportRulesIfEmpty(db);
+    }
+    if (oldVersion < 5) {
+      await _ensureLearningTables(db);
+      await _seedLearningArticlesIfEmpty(db);
+    }
+  }
+
+  Future<void> _ensureLearningTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS learning_articles (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        icon TEXT,
+        minutes INTEGER DEFAULT 5,
+        summary TEXT,
+        key_points_json TEXT,
+        action_tip TEXT,
+        body_md TEXT,
+        tags_json TEXT,
+        source TEXT DEFAULT 'seed',
+        pack_id TEXT,
+        published_at TEXT,
+        updated_at TEXT,
+        priority INTEGER DEFAULT 100,
+        is_active INTEGER DEFAULT 1
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS app_kv (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_learning_articles_active ON learning_articles(is_active)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_learning_articles_category ON learning_articles(category)',
+    );
+  }
+
+  Future<void> _seedLearningArticlesIfEmpty(Database db) async {
+    final count = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM learning_articles',
+    );
+    if (_toDatabaseInt(count.first['count']) > 0) return;
+    final batch = db.batch();
+    for (final article in LearningCatalog.seedArticles) {
+      batch.insert(
+        'learning_articles',
+        article.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> _ensureOperationalTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS import_batches (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        total_count INTEGER DEFAULT 0,
+        imported_count INTEGER DEFAULT 0,
+        skipped_count INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'processing',
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS import_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT NOT NULL,
+        name TEXT NOT NULL,
+        field_mapping TEXT NOT NULL,
+        date_format TEXT,
+        amount_sign_convention TEXT DEFAULT '支出为正',
+        skip_keywords TEXT,
+        is_default INTEGER DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS recurring_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        amount_fen INTEGER NOT NULL,
+        type TEXT NOT NULL DEFAULT 'expense' CHECK(type IN ('expense','income')),
+        category_id INTEGER REFERENCES categories(id),
+        frequency TEXT NOT NULL CHECK(frequency IN ('daily','weekly','monthly','yearly')),
+        interval_day INTEGER DEFAULT 1,
+        next_due_date TEXT NOT NULL,
+        description TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      )
+    ''');
+  }
+
+  Future<void> _ensureAccountColumns(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(accounts)');
+    final names = columns.map((row) => row['name'] as String).toSet();
+    if (!names.contains('balance_fen')) {
+      await db.execute(
+        'ALTER TABLE accounts ADD COLUMN balance_fen INTEGER DEFAULT 0',
+      );
+    }
+    if (!names.contains('include_in_net_worth')) {
+      await db.execute(
+        'ALTER TABLE accounts ADD COLUMN include_in_net_worth INTEGER DEFAULT 1',
+      );
+    }
+  }
+
+  Future<void> _ensureWealthTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS financial_goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        target_fen INTEGER NOT NULL,
+        current_fen INTEGER DEFAULT 0,
+        target_date TEXT,
+        icon TEXT DEFAULT '🎯',
+        color TEXT DEFAULT '#2D6A4F',
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS learning_progress (
+        article_id TEXT PRIMARY KEY,
+        completed INTEGER DEFAULT 0,
+        bookmarked INTEGER DEFAULT 0,
+        last_opened_at TEXT,
+        completed_at TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_goal_active ON financial_goals(is_active)',
+    );
+  }
+
+  Future<void> _seedImportRulesIfEmpty(Database db) async {
+    final count = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM import_rules',
+    );
+    if (_toDatabaseInt(count.first['count']) == 0) {
+      await _seedImportRules(db);
+    }
+  }
+
+  int _toDatabaseInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse('$value') ?? 0;
   }
 
   Future<void> _seedCategories(Database db) async {
@@ -974,6 +1145,26 @@ class AccountDao {
     );
   }
 
+  Future<int> updateFinancialProfile({
+    required int id,
+    required String name,
+    required int balanceFen,
+    required bool includeInNetWorth,
+  }) async {
+    final db = await _db.database;
+    return db.update(
+      'accounts',
+      {
+        'name': name,
+        'balance_fen': balanceFen,
+        'include_in_net_worth': includeInNetWorth ? 1 : 0,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<int> softDelete(int id) async {
     final db = await _db.database;
     return db.update(
@@ -1002,6 +1193,100 @@ class AccountDao {
         'updated_at': DateTime.now().toIso8601String(),
       });
     }
+  }
+}
+
+class FinancialGoalDao {
+  final DatabaseService _db = DatabaseService.instance;
+
+  Future<List<FinancialGoal>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'financial_goals',
+      where: 'is_active = 1',
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(FinancialGoal.fromMap).toList();
+  }
+
+  Future<int> insert(FinancialGoal goal) async {
+    final db = await _db.database;
+    return db.insert('financial_goals', goal.toMap());
+  }
+
+  Future<int> updateProgress(int id, int currentFen) async {
+    final db = await _db.database;
+    return db.update(
+      'financial_goals',
+      {
+        'current_fen': currentFen,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> softDelete(int id) async {
+    final db = await _db.database;
+    return db.update(
+      'financial_goals',
+      {'is_active': 0, 'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+}
+
+class LearningProgressDao {
+  final DatabaseService _db = DatabaseService.instance;
+
+  Future<List<LearningProgress>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query('learning_progress');
+    return rows.map(LearningProgress.fromMap).toList();
+  }
+
+  Future<void> markOpened(String articleId) async {
+    final db = await _db.database;
+    await db.insert('learning_progress', {
+      'article_id': articleId,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.update(
+      'learning_progress',
+      {'last_opened_at': DateTime.now().toIso8601String()},
+      where: 'article_id = ?',
+      whereArgs: [articleId],
+    );
+  }
+
+  Future<void> setCompleted(String articleId, bool completed) async {
+    final db = await _db.database;
+    await db.insert('learning_progress', {
+      'article_id': articleId,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.update(
+      'learning_progress',
+      {
+        'completed': completed ? 1 : 0,
+        'completed_at': completed ? DateTime.now().toIso8601String() : null,
+      },
+      where: 'article_id = ?',
+      whereArgs: [articleId],
+    );
+  }
+
+  Future<void> setBookmarked(String articleId, bool bookmarked) async {
+    final db = await _db.database;
+    await db.insert('learning_progress', {
+      'article_id': articleId,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.update(
+      'learning_progress',
+      {'bookmarked': bookmarked ? 1 : 0},
+      where: 'article_id = ?',
+      whereArgs: [articleId],
+    );
   }
 }
 
@@ -1188,4 +1473,139 @@ Future<void> _seedImportRules(Database db) async {
     'skip_keywords': '利息,结息,转账存入',
     'is_default': 1,
   });
+}
+
+class LearningArticleDao {
+  final DatabaseService _db = DatabaseService.instance;
+
+  Future<List<LearningArticle>> getActive() async {
+    final db = await _db.database;
+    await _ensureSeeded(db);
+    final rows = await db.query(
+      'learning_articles',
+      where: 'is_active = 1',
+      orderBy: 'priority DESC, updated_at DESC, id ASC',
+    );
+    return rows.map(LearningArticle.fromMap).toList();
+  }
+
+  Future<LearningArticle?> getById(String id) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'learning_articles',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return LearningArticle.fromMap(rows.first);
+  }
+
+  Future<void> _ensureSeeded(Database db) async {
+    final count = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM learning_articles',
+    );
+    final total = count.first['count'];
+    final n = total is int ? total : int.tryParse('$total') ?? 0;
+    if (n > 0) return;
+    final batch = db.batch();
+    for (final article in LearningCatalog.seedArticles) {
+      batch.insert(
+        'learning_articles',
+        article.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<LearningPackImportResult> upsertAll(
+    List<LearningArticle> articles, {
+    String source = 'import',
+  }) async {
+    final db = await _db.database;
+    var inserted = 0;
+    var updated = 0;
+    var skipped = 0;
+
+    for (final incoming in articles) {
+      final article = incoming.copyWith(source: source);
+      final existingRows = await db.query(
+        'learning_articles',
+        where: 'id = ?',
+        whereArgs: [article.id],
+        limit: 1,
+      );
+      if (existingRows.isEmpty) {
+        await db.insert('learning_articles', article.toMap());
+        inserted++;
+        continue;
+      }
+      final existing = LearningArticle.fromMap(existingRows.first);
+      final incomingTs = article.updatedAt ?? article.publishedAt ?? '';
+      final existingTs = existing.updatedAt ?? existing.publishedAt ?? '';
+      if (incomingTs.isNotEmpty &&
+          existingTs.isNotEmpty &&
+          incomingTs.compareTo(existingTs) < 0) {
+        skipped++;
+        continue;
+      }
+      await db.update(
+        'learning_articles',
+        article.toMap(),
+        where: 'id = ?',
+        whereArgs: [article.id],
+      );
+      updated++;
+    }
+
+    return LearningPackImportResult(
+      inserted: inserted,
+      updated: updated,
+      skipped: skipped,
+    );
+  }
+}
+
+class LearningPackImportResult {
+  final int inserted;
+  final int updated;
+  final int skipped;
+
+  const LearningPackImportResult({
+    required this.inserted,
+    required this.updated,
+    required this.skipped,
+  });
+
+  int get touched => inserted + updated;
+}
+
+class AppKvDao {
+  final DatabaseService _db = DatabaseService.instance;
+
+  Future<String?> get(String key) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'app_kv',
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['value'] as String?;
+  }
+
+  Future<void> set(String key, String? value) async {
+    final db = await _db.database;
+    if (value == null) {
+      await db.delete('app_kv', where: 'key = ?', whereArgs: [key]);
+      return;
+    }
+    await db.insert('app_kv', {
+      'key': key,
+      'value': value,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
 }

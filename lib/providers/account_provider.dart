@@ -6,6 +6,7 @@ final accountsProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
   final dao = AccountDao();
+  await dao.seedDefaults();
   return dao.getAll();
 });
 
@@ -15,12 +16,14 @@ final accountListProvider =
       AccountNotifier,
       AsyncValue<List<Map<String, dynamic>>>
     >((ref) {
-      return AccountNotifier();
+      return AccountNotifier(ref);
     });
 
 class AccountNotifier
     extends StateNotifier<AsyncValue<List<Map<String, dynamic>>>> {
-  AccountNotifier() : super(const AsyncValue.loading()) {
+  final Ref _ref;
+
+  AccountNotifier(this._ref) : super(const AsyncValue.loading()) {
     load();
   }
 
@@ -39,18 +42,21 @@ class AccountNotifier
   Future<void> addAccount(String name, String type) async {
     final dao = AccountDao();
     await dao.insert(name, type);
+    _ref.invalidate(accountsProvider);
     await load();
   }
 
   Future<void> updateAccount(int id, String name) async {
     final dao = AccountDao();
     await dao.update(id, name);
+    _ref.invalidate(accountsProvider);
     await load();
   }
 
   Future<void> deleteAccount(int id) async {
     final dao = AccountDao();
     await dao.softDelete(id);
+    _ref.invalidate(accountsProvider);
     await load();
   }
 }

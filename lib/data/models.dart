@@ -426,3 +426,91 @@ class RecurringTransaction {
     'created_at': createdAt.toIso8601String(),
   };
 }
+
+/// 储蓄目标。金额统一使用分，和交易记录保持一致。
+class FinancialGoal {
+  final int? id;
+  final String name;
+  final int targetFen;
+  final int currentFen;
+  final String? targetDate;
+  final String icon;
+  final String color;
+  final bool isActive;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const FinancialGoal({
+    this.id,
+    required this.name,
+    required this.targetFen,
+    this.currentFen = 0,
+    this.targetDate,
+    this.icon = '🎯',
+    this.color = '#2D6A4F',
+    this.isActive = true,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  double get progress =>
+      targetFen <= 0 ? 0 : (currentFen / targetFen).clamp(0.0, 1.0);
+
+  int get remainingFen => (targetFen - currentFen).clamp(0, targetFen);
+
+  factory FinancialGoal.fromMap(Map<String, dynamic> map) {
+    return FinancialGoal(
+      id: map['id'] as int?,
+      name: map['name'] as String,
+      targetFen: (map['target_fen'] as num).toInt(),
+      currentFen: (map['current_fen'] as num? ?? 0).toInt(),
+      targetDate: map['target_date'] as String?,
+      icon: map['icon'] as String? ?? '🎯',
+      color: map['color'] as String? ?? '#2D6A4F',
+      isActive: (map['is_active'] as int? ?? 1) == 1,
+      createdAt: DateTime.parse(map['created_at'] as String),
+      updatedAt: DateTime.parse(map['updated_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'target_fen': targetFen,
+    'current_fen': currentFen,
+    'target_date': targetDate,
+    'icon': icon,
+    'color': color,
+    'is_active': isActive ? 1 : 0,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+  };
+}
+
+class LearningProgress {
+  final String articleId;
+  final bool completed;
+  final bool bookmarked;
+  final DateTime? lastOpenedAt;
+  final DateTime? completedAt;
+
+  const LearningProgress({
+    required this.articleId,
+    this.completed = false,
+    this.bookmarked = false,
+    this.lastOpenedAt,
+    this.completedAt,
+  });
+
+  factory LearningProgress.fromMap(Map<String, dynamic> map) {
+    DateTime? parseDate(Object? value) =>
+        value is String && value.isNotEmpty ? DateTime.tryParse(value) : null;
+
+    return LearningProgress(
+      articleId: map['article_id'] as String,
+      completed: (map['completed'] as int? ?? 0) == 1,
+      bookmarked: (map['bookmarked'] as int? ?? 0) == 1,
+      lastOpenedAt: parseDate(map['last_opened_at']),
+      completedAt: parseDate(map['completed_at']),
+    );
+  }
+}

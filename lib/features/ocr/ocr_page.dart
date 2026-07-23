@@ -17,7 +17,6 @@ class _OcrPageState extends ConsumerState<OcrPage> {
   final _picker = ImagePicker();
   String? _imagePath;
   bool _isProcessing = false;
-  String? _ocrResult;
   Map<String, String>? _extractedData; // OCR 提取结果
 
   @override
@@ -384,7 +383,6 @@ class _OcrPageState extends ConsumerState<OcrPage> {
     setState(() {
       _imagePath = null;
       _extractedData = null;
-      _ocrResult = null;
     });
   }
 

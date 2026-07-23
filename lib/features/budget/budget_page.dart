@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
-import '../../data/models.dart';
 import '../../providers/budget_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/transaction_provider.dart';
@@ -158,7 +157,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     VoidCallback onTap,
   ) {
     final hasBudget = budget != null && budget > 0;
-    final ratio = hasBudget ? (spent / budget!).clamp(0.0, 1.0) : 0.0;
+    final ratio = hasBudget ? (spent / budget).clamp(0.0, 1.0) : 0.0;
     final isOver = ratio >= 1.0;
     final isWarning = ratio >= 0.8 && ratio < 1.0;
     final color = isOver
@@ -187,7 +186,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                   ),
                   if (hasBudget)
                     Text(
-                      '${MoneyUtils.fenToYuan(spent)} / ${MoneyUtils.fenToYuan(budget!)}',
+                      '${MoneyUtils.fenToYuan(spent)} / ${MoneyUtils.fenToYuan(budget)}',
                       style: TextStyle(
                         fontSize: 13,
                         color: isOver
@@ -213,7 +212,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                 Text(
                   isOver
                       ? '⚠️ 已超预算 ${MoneyUtils.fenToYuan(spent - budget)}'
-                      : '剩余 ${MoneyUtils.fenToYuan(budget! - spent)} (${(ratio * 100).toStringAsFixed(0)}%)',
+                      : '剩余 ${MoneyUtils.fenToYuan(budget - spent)} (${(ratio * 100).toStringAsFixed(0)}%)',
                   style: TextStyle(
                     fontSize: 12,
                     color: isOver ? AppColors.expense : AppColors.textSecondary,

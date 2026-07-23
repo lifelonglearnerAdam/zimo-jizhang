@@ -3,10 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
-import '../../features/import/category_matcher.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/category_provider.dart';
-import '../../data/models.dart';
 
 /// 语音记账页面
 class VoiceInputPage extends ConsumerStatefulWidget {
@@ -19,7 +17,6 @@ class VoiceInputPage extends ConsumerStatefulWidget {
 class _VoiceInputPageState extends ConsumerState<VoiceInputPage> {
   final _textController = TextEditingController();
   bool _isListening = false;
-  String _resultText = '';
 
   // 解析结果
   double? _parsedAmount;
@@ -307,7 +304,6 @@ class _VoiceInputPageState extends ConsumerState<VoiceInputPage> {
       _parsedType = type;
       _parsedDesc = desc.isNotEmpty ? desc : null;
       _parsedDate = date;
-      _resultText = text;
     });
   }
 

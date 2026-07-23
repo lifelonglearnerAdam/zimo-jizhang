@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
-import '../../data/database.dart';
 import '../../data/models.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/database_provider.dart';
