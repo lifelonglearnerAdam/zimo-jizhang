@@ -409,7 +409,6 @@ class _ImportPreviewPageState extends ConsumerState<ImportPreviewPage> {
       // 基于简单关键词匹配做自动分类
       final text = '${entry.description} ${entry.counterparty}';
       int? bestCatId;
-      int bestScore = 0;
 
       // 关键词规则（借鉴 BeeCount 思路）
       final rules = <String, List<String>>{
@@ -445,7 +444,6 @@ class _ImportPreviewPageState extends ConsumerState<ImportPreviewPage> {
             for (final cat in allCats) {
               if (cat.category.name.contains(rule.key)) {
                 bestCatId = cat.category.id;
-                bestScore = 5;
                 break;
               }
             }

@@ -1,7 +1,7 @@
 name: zimo_jizhang
 description: "子墨记账 - 本地优先的全平台个人记账应用"
 publish_to: 'none'
-version: 2.0.1+4
+version: 2.2.0+6
 
 environment:
   sdk: ^3.10.7
@@ -45,6 +45,7 @@ dependencies:
 
   # 智能功能（手机端专用）
   image_picker: ^1.1.2
+  flutter_markdown: ^0.7.7+1
 
 dev_dependencies:
   flutter_test:

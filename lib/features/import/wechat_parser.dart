@@ -1,5 +1,4 @@
 import '../../core/csv_parser.dart';
-import '../../data/models.dart';
 
 /// 微信账单解析器
 class WechatParser {

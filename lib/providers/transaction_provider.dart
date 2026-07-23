@@ -50,6 +50,21 @@ final categoryExpensesProvider = FutureProvider<List<CategoryExpense>>((
   return dao.getCategoryExpensesByMonth(yearMonth);
 });
 
+final monthCategoryExpensesProvider =
+    FutureProvider.family<List<CategoryExpense>, String>((
+      ref,
+      yearMonth,
+    ) async {
+      final dao = ref.watch(transactionDaoProvider);
+      return dao.getCategoryExpensesByMonth(yearMonth);
+    });
+
+final monthDailyExpensesProvider =
+    FutureProvider.family<List<DailyExpense>, String>((ref, yearMonth) async {
+      final dao = ref.watch(transactionDaoProvider);
+      return dao.getDailyExpensesByMonth(yearMonth);
+    });
+
 /// 某月交易记录
 final monthTransactionsProvider =
     FutureProvider.family<List<TransactionModel>, String>((

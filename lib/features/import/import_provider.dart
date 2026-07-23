@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'dart:typed_data';
 import '../../data/models.dart';
-import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import '../../core/csv_parser.dart';
 import 'wechat_parser.dart';
@@ -152,8 +151,6 @@ class ImportNotifier extends StateNotifier<ImportState> {
     try {
       final txDao = _ref.read(transactionDaoProvider);
       final now = DateTime.now();
-      final batchId = 'import_${now.millisecondsSinceEpoch}';
-
       int imported = 0;
       int skipped = 0;
 

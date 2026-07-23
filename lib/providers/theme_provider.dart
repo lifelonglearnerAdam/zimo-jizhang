@@ -1,5 +1,4 @@
 import "package:sqflite/sqflite.dart";
-import 'package:flutter/material.dart' show Brightness;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database.dart';
 
