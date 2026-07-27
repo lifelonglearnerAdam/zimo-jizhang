@@ -1,0 +1,89 @@
+name: Daily Learning Article
+
+on:
+  schedule:
+    # 每天早上 8:00 (北京时间 UTC+8 → 00:00 UTC)
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # 允许手动触发
+
+permissions:
+  contents: write   # 允许 push
+
+jobs:
+  generate-and-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate today's article
+        env:
+          ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+          ZIMO_LEARNING_MODEL: ${{ vars.ZIMO_LEARNING_MODEL || 'claude-sonnet-5' }}
+        run: |
+          # Rotate through topics by day-of-month
+          DAY=$(date +%d)
+          TOPICS=(
+            "指数基金适合普通人吗"
+            "信用卡的正确使用方式"
+            "如何评估一只基金"
+            "保险配置的基本逻辑"
+            "年终奖怎么分配最合理"
+            "退休金缺口怎么算"
+            "教育金规划从几岁开始"
+            "家庭CFO该做的事"
+            "消费降级不等于生活降级"
+            "理财的第一步到底是什么"
+            "复利的真正秘密"
+            "定投的纪律与灵活"
+            "养老目标基金值不值得买"
+            "财务自由的四个阶段"
+            "如何跟伴侣聊钱"
+            "被动收入真的存在吗"
+            "为什么记账是理财的起点"
+            "投资中的反直觉真相"
+            "节俭与生活质量如何平衡"
+            "数字货币与普通人"
+            "理财陷阱：那些年我们交过的智商税"
+            "从月光族到有积蓄"
+            "孩子的财商教育"
+            "买金条还是买黄金ETF"
+            "房贷要不要提前还"
+            "自由职业者的财务管理"
+            "代际财富传承入门"
+            "如何看待理财产品收益率"
+            "年底盘点的正确姿势"
+            "信息过载时代的理财观"
+            "钱和时间哪个更值钱"
+          )
+          IDX=$((10#$DAY % ${#TOPICS[@]}))
+          TOPIC="${TOPICS[$IDX]}"
+          echo "Today's topic: $TOPIC"
+          python tools/learning_pipeline/generate_daily.py generate \
+            --topic "$TOPIC" \
+            --category "财务基础" \
+            --icon "📅" \
+            --minutes 16 \
+            --verbose
+
+      - name: Pack content
+        run: |
+          python tools/learning_pipeline/generate_daily.py pack \
+            --out content/dist/learning-pack-latest.json
+
+      - name: Commit and push
+        run: |
+          git config user.name "zimo-bot"
+          git config user.email "bot@zimo.jizhang"
+          git add content/
+          if git diff --staged --quiet; then
+            echo "No new content to commit"
+          else
+            git commit -m "auto: daily article $(date +%Y-%m-%d)"
+            git push
+            echo "Pushed new content"
+          fi
