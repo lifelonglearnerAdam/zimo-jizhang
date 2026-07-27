@@ -195,6 +195,18 @@
       "published_at": "2026-07-23",
       "updated_at": "2026-07-23",
       "priority": 95
+    },
+    {
+      "id": "article-20260727",
+      "path": "articles/article-20260727.md",
+      "title": "如何看待理财产品收益率",
+      "category": "财务基础",
+      "icon": "📅",
+      "minutes": 16,
+      "summary": "如何看待理财产品收益率",
+      "published_at": "2026-07-27",
+      "updated_at": "2026-07-27",
+      "priority": 100
     }
   ]
 }
