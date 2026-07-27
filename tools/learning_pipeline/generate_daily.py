@@ -346,6 +346,9 @@ def cmd_generate(args: argparse.Namespace) -> int:
         )
     topic = args.topic
     article_id = args.id or re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")[:48]
+    # Fallback for pure-CJK topics: use today's date stamp
+    if not article_id:
+        article_id = f"article-{date.today().strftime('%Y%m%d')}"
     prompt = (
         "你是中文财商专栏作者。请写一篇面向普通人的深度长文，主题："
         f"{topic}\n\n"
