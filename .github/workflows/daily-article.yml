@@ -23,7 +23,7 @@ jobs:
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
-          ZIMO_LEARNING_MODEL: ${{ vars.ZIMO_LEARNING_MODEL || 'deepseek-chat' }}
+          ZIMO_LEARNING_MODEL: ${{ vars.ZIMO_LEARNING_MODEL || 'deepseek-v4-pro' }}
         run: |
           # Rotate through topics by day-of-month
           DAY=$(date +%d)
