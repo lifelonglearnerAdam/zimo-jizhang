@@ -219,6 +219,18 @@
       "published_at": "2026-07-28",
       "updated_at": "2026-07-28",
       "priority": 100
+    },
+    {
+      "id": "article-20260729",
+      "path": "articles/article-20260729.md",
+      "title": "信息过载时代的理财观",
+      "category": "财务基础",
+      "icon": "📅",
+      "minutes": 16,
+      "summary": "信息过载时代的理财观",
+      "published_at": "2026-07-29",
+      "updated_at": "2026-07-29",
+      "priority": 100
     }
   ]
 }
