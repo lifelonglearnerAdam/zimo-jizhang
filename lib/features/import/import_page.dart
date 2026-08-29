@@ -121,14 +121,13 @@ class ImportPage extends ConsumerWidget {
   Future<void> _pickAndParse(WidgetRef ref, String source) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['csv', 'CSV', 'txt', 'TXT'],
+      allowedExtensions: ['csv', 'CSV', 'txt', 'TXT', 'xlsx', 'XLSX', 'xls', 'XLS'],
       allowMultiple: false,
       withData: true, // Web 端需要读取字节数据
     );
 
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.single;
-      // Web 端优先使用 bytes，桌面端也可用 path 读取后再转换为兼容
       if (file.bytes != null) {
         await ref
             .read(importProvider.notifier)

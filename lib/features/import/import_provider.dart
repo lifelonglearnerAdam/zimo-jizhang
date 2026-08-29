@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:typed_data';
 import '../../data/models.dart';
 import '../../providers/database_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../../core/csv_parser.dart';
 import 'wechat_parser.dart';
 import 'alipay_parser.dart';
@@ -95,7 +96,7 @@ class ImportNotifier extends StateNotifier<ImportState> {
       final allExisting = await txDao.getAll(limit: 1000);
       for (final tx in allExisting) {
         final key =
-            '${tx.transactionDate}_${tx.amountFen}_${tx.counterparty ?? ''}';
+            '${tx.transactionDate}_${tx.amountFen}_${tx.type}_${tx.counterparty ?? ''}';
         existingDates.putIfAbsent(tx.transactionDate, () => {}).add(key);
       }
 
@@ -105,7 +106,8 @@ class ImportNotifier extends StateNotifier<ImportState> {
 
       for (var i = 0; i < entries.length; i++) {
         final e = entries[i];
-        final dupKey = '${e.date}_${e.amountFen}_${e.counterparty}';
+        // 去重 key 必须包含 type，否则美团买35元和退35元会被当成重复丢弃
+        final dupKey = '${e.date}_${e.amountFen}_${e.type}_${e.counterparty}';
 
         // 文件内去重
         if (seenInFile.contains(dupKey)) continue;
@@ -144,6 +146,7 @@ class ImportNotifier extends StateNotifier<ImportState> {
   /// 确认导入（批量写入数据库）
   Future<void> confirmImport({
     required Map<int, int> categoryAssignments, // index -> categoryId
+    List<int> excludedIndices = const [], // 用户主动排除的条目
   }) async {
     if (state.previewEntries.isEmpty) return;
     state = state.copyWith(isImporting: true);
@@ -151,11 +154,17 @@ class ImportNotifier extends StateNotifier<ImportState> {
     try {
       final txDao = _ref.read(transactionDaoProvider);
       final now = DateTime.now();
+      final excludedSet = excludedIndices.toSet();
       int imported = 0;
       int skipped = 0;
 
       for (final entry in state.previewEntries) {
         if (entry.isDuplicate) {
+          skipped++;
+          continue;
+        }
+
+        if (excludedSet.contains(entry.index)) {
           skipped++;
           continue;
         }
@@ -181,6 +190,16 @@ class ImportNotifier extends StateNotifier<ImportState> {
         );
         imported++;
       }
+
+      // 刷新主页数据
+      _ref.invalidate(todayTransactionsProvider);
+      _ref.invalidate(todayTotalProvider);
+      _ref.invalidate(monthTotalProvider);
+      _ref.invalidate(monthIncomeProvider);
+      _ref.invalidate(monthCountProvider);
+      _ref.invalidate(categoryExpensesProvider);
+      _ref.invalidate(allTransactionsProvider);
+      _ref.invalidate(recentTransactionsProvider);
 
       state = state.copyWith(
         isImporting: false,
