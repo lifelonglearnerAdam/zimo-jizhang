@@ -22,7 +22,16 @@ class LearningPackService {
   final LearningArticleDao _articleDao = LearningArticleDao();
   final AppKvDao _kv = AppKvDao();
 
-  Future<String?> getPackUrl() => _kv.get(packUrlKey);
+  /// Default content pack served from GitHub Pages. Updated daily by CI.
+  static const defaultPackUrl =
+      'https://lifelonglearnerAdam.github.io/zimo-jizhang/'
+      'content/dist/learning-pack-latest.json';
+
+  Future<String?> getPackUrl() async {
+    final saved = await _kv.get(packUrlKey);
+    if (saved != null) return saved.isEmpty ? null : saved;
+    return defaultPackUrl;
+  }
 
   Future<void> setPackUrl(String? url) => _kv.set(packUrlKey, url);
 

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Subtle inner glow for depth without shadows -->
+    <radialGradient id="innerGlow" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#3A7D5C" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#1E4A33" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Coin motif: barely-there metallic ring -->
+    <linearGradient id="coinRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.12"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background — 102px radius = iOS icon aesthetic -->
+  <rect x="0" y="0" width="512" height="512" rx="108" ry="108" fill="#2D6A4F"/>
+
+  <!-- Inner glow overlay -->
+  <rect x="0" y="0" width="512" height="512" rx="108" ry="108" fill="url(#innerGlow)"/>
+
+  <!-- Subtle coin motif — bottom-right quadrant, whisper of finance -->
+  <circle cx="395" cy="395" r="68" fill="none" stroke="url(#coinRing)" stroke-width="1.5"/>
+  <circle cx="395" cy="395" r="58" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+  <!-- Coin square hole (ancient Chinese coin) -->
+  <rect x="385" y="385" width="20" height="20" rx="3" fill="none" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="1.2"/>
+
+  <!-- Central character "墨" — hand-tuned calligraphic weight -->
+  <!-- Using system serif for calligraphic feel -->
+  <text x="256" y="278" font-family="'SimSun', 'Songti SC', 'Noto Serif CJK SC', 'STSong', 'SimKai', 'KaiTi', serif" font-size="210" font-weight="700" fill="#F7F8F9" text-anchor="middle" dominant-baseline="central" letter-spacing="0">墨</text>
+
+  <!-- Subtle abacus bead motif — top-left quadrant, tiny echo -->
+  <circle cx="138" cy="128" r="12" fill="none" stroke="#FFFFFF" stroke-opacity="0.10" stroke-width="1.2"/>
+  <circle cx="110" cy="142" r="12" fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="1"/>
+  <circle cx="166" cy="142" r="12" fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="1"/>
+
+  <!-- Minute dividing line — abstract ledger reference -->
+  <line x1="120" y1="390" x2="392" y2="390" stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="0.8"/>
+</svg>
